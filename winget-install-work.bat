@@ -1,3 +1,5 @@
+:: Install gaming applications
+:: ----------------------------------------------------------------------
 echo Installing Microsoft OneDrive
 winget install Microsoft.OneDrive
 

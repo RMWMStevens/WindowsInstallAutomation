@@ -1,4 +1,4 @@
-:: Uninstall general bloatware
+:: Uninstall pre-installed Microsoft bloatware
 :: ----------------------------------------------------------------------
 echo Uninstalling Cortana
 winget uninstall cortana
