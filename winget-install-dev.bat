@@ -1,5 +1,6 @@
 :: Install dev applications
 :: ----------------------------------------------------------------------
+@echo off
 echo Installing Git
 winget install Git.Git
 
@@ -20,3 +21,5 @@ winget install Postman.Postman
 
 echo Installing Visual Studio Enterprise 2022
 winget install Microsoft.VisualStudio.2022.Enterprise
+
+pause

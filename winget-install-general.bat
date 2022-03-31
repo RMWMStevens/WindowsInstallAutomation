@@ -1,5 +1,6 @@
 :: Install general applications
 :: ----------------------------------------------------------------------
+@echo off
 echo Installing 7Zip...
 winget install 7zip.7zip
 
@@ -44,3 +45,5 @@ winget install VideoLAN.VLC
 
 echo Installing WhatsApp
 winget install WhatsApp.WhatsApp
+
+pause

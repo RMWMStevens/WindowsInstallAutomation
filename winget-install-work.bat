@@ -1,5 +1,6 @@
 :: Install gaming applications
 :: ----------------------------------------------------------------------
+@echo off
 echo Installing Microsoft OneDrive
 winget install Microsoft.OneDrive
 
@@ -8,3 +9,5 @@ winget install SlackTechnologies.Slack
 
 echo Installing SoapUI
 winget install SmartBear.SoapUI
+
+pause

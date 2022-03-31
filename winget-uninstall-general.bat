@@ -1,5 +1,6 @@
 :: Uninstall pre-installed Microsoft bloatware
 :: ----------------------------------------------------------------------
+@echo off
 echo Uninstalling Cortana
 winget uninstall cortana
 
@@ -72,3 +73,5 @@ winget uninstall Microsoft.Todos_8wekyb3d8bbwe
 winget uninstall Microsoft.PowerAutomateDesktop_8wekyb3d8bbwe
 winget uninstall Microsoft.BingNews_8wekyb3d8bbwe
 winget uninstall MicrosoftTeams_8wekyb3d8bbwe
+
+pause
