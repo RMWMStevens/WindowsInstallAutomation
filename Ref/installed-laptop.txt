@@ -1,0 +1,121 @@
+Name                                      Id                                         Version           Available Source
+-----------------------------------------------------------------------------------------------------------------------
+Teams                                     203abbb73ce1f8cae10c1c0094adc2cd           1.0
+SoapUI                                    SmartBear.SoapUI                           5.7.0                       winget
+7-Zip                                     7zip.7zip                                  21.07                       winget
+Teams (1)                                 7a8845ff0546116baf9d6052bf303dcf           1.0
+AMD Software                              AMD Catalyst Install Manager               22.2.1
+AMD Chipset Software                      AMD_Chipset_IODrivers                      3.10.08.506
+AnyDesk                                   AnyDeskSoftwareGmbH.AnyDesk                ad 7.0.5          ad 7.0.7  winget
+Discord                                   Discord.Discord                            1.0.9003          1.0.9004  winget
+Dolby Access                              DolbyLaboratories.DolbyAccess_rz1tebttyb2… 3.12.419.0
+Lenovo Vantage                            E046963F.LenovoCompanion_k1h2ywk1493x8     10.2202.9.0
+EdgeDeflector                             da2x.EdgeDeflector                         1.2.3.0                     winget
+Elevoc Vocplus System                     ElevocTechnologyCo.Ltd.ElevocVocplusSyste… 1.0.29.0
+Everything 1.4.1.1015 (x64)               Everything                                 1.4.1.1015
+GitHub Desktop                            GitHub.GitHubDesktop                       2.9.6             2.9.12    winget
+Git                                       Git.Git                                    2.35.1.2                    winget
+Google Chrome                             Google.Chrome                              100.0.4896.60               winget
+HWiNFO                                    REALiX.HWiNFO                              7.22                        winget
+Microsoft Azure Compute Emulator - v2.9.7 Microsoft Azure Compute Emulator - v2.9.7  2.9.8999.43
+Microsoft Edge                            Microsoft.Edge                             99.0.1150.55                winget
+Microsoft Edge Update                     Microsoft Edge Update                      1.3.155.85
+Microsoft Edge WebView2 Runtime           Microsoft.EdgeWebView2Runtime              99.0.1150.55                winget
+Microsoft Help Viewer 2.3                 Microsoft Help Viewer 2.3                  2.3.28107
+Microsoft SQL Server 2019 (64-bit)        Microsoft SQL Server SQL2019               Unknown
+Cortana                                   Microsoft.549981C3F5F10_8wekyb3d8bbwe      3.2202.10603.0
+MSN Weather                               Microsoft.BingWeather_8wekyb3d8bbwe        1.0.6.0
+App Installer                             Microsoft.DesktopAppInstaller_8wekyb3d8bb… 1.17.10271.0
+Get Help                                  Microsoft.GetHelp_8wekyb3d8bbwe            10.2201.421.0
+Microsoft Tips                            Microsoft.Getstarted_8wekyb3d8bbwe         10.2203.10.0
+HEIF Image Extensions                     Microsoft.HEIFImageExtension_8wekyb3d8bbwe 1.0.43012.0
+English (United Kingdom) Local Experienc… Microsoft.LanguageExperiencePacken-GB_8we… 22000.17.51.0
+Local Experience-pakket voor Nederlands   Microsoft.LanguageExperiencePacknl-NL_8we… 22000.17.50.0
+Microsoft Edge                            Microsoft.MicrosoftEdge.Stable_8wekyb3d8b… 98.0.1108.55
+OneDrive                                  Microsoft.OneDriveSync_8wekyb3d8bbwe       22055.313.1.0
+Paint                                     Microsoft.Paint_8wekyb3d8bbwe              11.2201.22.0
+Microsoft People                          Microsoft.People_8wekyb3d8bbwe             10.2105.4.0
+Power Automate                            Microsoft.PowerAutomateDesktop_8wekyb3d8b… 1.0.167.0
+Snipping Tool                             Microsoft.ScreenSketch_8wekyb3d8bbwe       11.2201.12.0
+Windows Security                          Microsoft.SecHealthUI_8wekyb3d8bbwe        1000.22000.1.0
+Store Experience Host                     Microsoft.StorePurchaseApp_8wekyb3d8bbwe   12109.1001.10.0
+VP9 Video Extensions                      Microsoft.VP9VideoExtensions_8wekyb3d8bbwe 1.0.42791.0
+Web Media Extensions                      Microsoft.WebMediaExtensions_8wekyb3d8bbwe 1.0.42192.0
+Webp Image Extensions                     Microsoft.WebpImageExtension_8wekyb3d8bbwe 1.0.42351.0
+Microsoft Photos                          Microsoft.Windows.Photos_8wekyb3d8bbwe     2021.21120.8011.0
+Windows Alarms & Clock                    Microsoft.WindowsAlarms_8wekyb3d8bbwe      1.0.38.0
+Windows Calculator                        Microsoft.WindowsCalculator_8wekyb3d8bbwe  11.2201.4.0
+Windows Camera                            Microsoft.WindowsCamera_8wekyb3d8bbwe      2022.2201.4.0
+Feedback Hub                              Microsoft.WindowsFeedbackHub_8wekyb3d8bbwe 1.2203.761.0
+Windows Maps                              Microsoft.WindowsMaps_8wekyb3d8bbwe        1.0.28.0
+Notepad                                   Microsoft.WindowsNotepad_8wekyb3d8bbwe     11.2112.32.0
+Windows Voice Recorder                    Microsoft.WindowsSoundRecorder_8wekyb3d8b… 1.0.42.0
+Microsoft Store                           Microsoft.WindowsStore_8wekyb3d8bbwe       22203.1401.21.0
+Windows Terminal                          Microsoft.WindowsTerminal                  1.11.3471.0       1.12.107… winget
+Windows Package Manager Source (winget)   Microsoft.Winget.Source_8wekyb3d8bbwe      2022.331.1732.625
+Xbox Game Bar Plugin                      Microsoft.XboxGameOverlay_8wekyb3d8bbwe    1.54.4001.0
+Xbox Game Bar                             Microsoft.XboxGamingOverlay_8wekyb3d8bbwe  5.721.12013.0
+Xbox Identity Provider                    Microsoft.XboxIdentityProvider_8wekyb3d8b… 12.85.31001.0
+Xbox Game Speech Window                   Microsoft.XboxSpeechToTextOverlay_8wekyb3… 1.21.13002.0
+Your Phone                                Microsoft.YourPhone_8wekyb3d8bbwe          1.22022.147.0
+Films & TV                                Microsoft.ZuneVideo_8wekyb3d8bbwe          10.22021.10291.0
+Microsoft Teams                           MicrosoftTeams_8wekyb3d8bbwe               22055.502.1226.2…
+Windows Web Experience Pack               MicrosoftWindows.Client.WebExperience_cw5… 421.20070.95.0
+Microsoft 365 Apps for enterprise         Microsoft.Office                           16.0.14326.20852  16.0.149… winget
+Microsoft 365-apps voor ondernemingen - … O365ProPlusRetail - nl-nl                  16.0.14326.20852
+Microsoft OneDrive                        Microsoft.OneDrive                         22.055.0313.0001            winget
+Origin                                    Origin                                     10.5.111.50299
+Plex                                      Plex.Plex                                  1.39.1            1.42.1    winget
+Postman                                   Postman.Postman                            9.14.0            9.15.2    winget
+Realtek Audio Control                     RealtekSemiconductorCorp.RealtekAudioCont… 1.27.254.0
+League of Legends                         Riot Game league_of_legends.live           Unknown
+STACK                                     TransIP.STACK                              2.8.2.20210809              winget
+Spotify Music                             SpotifyAB.SpotifyMusic_zpdnekdrzrea0       1.181.604.0
+Steam                                     Valve.Steam                                2.10.91.91                  winget
+Forza Horizon 5                           Steam App 1551360                          Unknown
+Overcooked! 2                             Steam App 728880                           Unknown
+TeamViewer                                TeamViewer.TeamViewer                      15.26.4           15.28.5   winget
+Microsoft Teams                           Microsoft.Teams                            1.5.00.8070                 winget
+VLC media player                          VideoLAN.VLC                               3.0.16            3.0.17    winget
+Lenovo Vantage Service                    VantageSRV_is1                             3.11.20.0
+WhatsApp                                  WhatsApp.WhatsApp                          2.2208.15                   winget
+Winaero Tweaker                           Winaero Tweaker_is1                        1.33.0.0
+Visual Studio Enterprise 2022             Microsoft.VisualStudio.2022.Enterprise     17.1.2                      winget
+Mail and Calendar                         microsoft.windowscommunicationsapps_8weky… 16005.14326.2085…
+Outlook (PWA)                             outlook.office.com-F53E19B5_akxy2sb7nnr06  1.0.0.1
+Slack                                     SlackTechnologies.Slack                    4.24.0            4.25.0    winget
+IIS 10.0 Express                          {028D4B22-B70B-447E-9B80-8E3E98CB2667}     10.0.06027
+Microsoft Visual C++ 2013 Redistributabl… Microsoft.VC++2013Redist-x64               12.0.30501.0      12.0.406… winget
+Microsoft SQL Server 2019 Setup (English) {17DCED0E-5B27-453A-B2B4-E487B869B28A}     15.0.4013.40
+Microsoft Visual C++ 2010 x64 Redistribu… Microsoft.VC++2010Redist-x64               10.0.40219                  winget
+Microsoft VSS Writer for SQL Server 2019  {2C33F4D4-E9A5-4DE1-ACFE-3A13464E6703}     15.0.2000.5
+Microsoft SQL Server 2019 T-SQL Language… {31D27B41-A051-49D8-907A-62E0F4A2188C}     15.0.2000.5
+Microsoft SQL Server 2019 LocalDB         {36E492B8-CB83-4DA5-A5D2-D99A8E8228A1}     15.0.4153.1
+Windows Software Development Kit          Microsoft.WindowsSDK                       10.1.19041.685              winget
+Microsoft Update Health Tools             {4812E2CC-BAA9-49AE-B310-DA845882322B}     4.66.0.0
+Microsoft Visual C++ 2015-2022 Redistrib… Microsoft.VC++2015-2022Redist-x86          14.30.30704.0     14.32.31… winget
+Microsoft .NET SDK 6.0.201 (x64) from Vi… {523CF0D5-3186-4886-84C1-0F33795C0E51}     6.2.122.12412
+Microsoft Visual C++ 2015-2022 Redistrib… Microsoft.VC++2015-2022Redist-x64          14.30.30704.0     14.32.31… winget
+Microsoft System CLR Types for SQL Serve… Microsoft.CLRTypesSQLServer.2019           15.0.2000.5                 winget
+Browser for SQL Server 2019               {5E366957-8D78-4BB5-A790-96F97A9766BD}     15.0.2000.5
+Command & ConquerTM: Generals and Zero H… {609F6FD5-4B22-4D7A-AD30-8C9DD480D5BE}     1.0.0.0
+Azure Data Studio                         {6591F69E-6588-4980-81ED-C8FCBD7EC4B8}_is1 1.34.0
+Microsoft Visual Studio Installer         {6F320B93-EE3C-4826-85E0-ADF79F8D4C61}     3.1.2196.8931
+Microsoft Visual C++ 2005 Redistributable {7299052b-02a4-4627-81f2-1818da5d550d}     8.0.56336
+Microsoft Teams                           Microsoft.Teams                            1.4.0.2781        1.5.00.5… winget
+LINQPad 7                                 LINQPad.LINQPad.7                          7.1.5             7.2.7     winget
+Microsoft Visual Studio Code              Microsoft.VisualStudioCode                 1.66.0                      winget
+Python Launcher                           {7DE12550-BE09-44DD-BDB4-0EC26BA89DAF}     3.10.7644.0
+Microsoft ODBC Driver 17 for SQL Server   {853997DA-6FCB-4FB9-918E-E0FF881FAF65}     17.7.2.1
+PowerToys (Preview)                       Microsoft.PowerToys                        0.56.2            0.57.0    winget
+Microsoft Azure Storage Explorer          Microsoft.AzureStorageExplorer             1.22.1            1.23.0    winget
+Microsoft OLE DB Driver for SQL Server    {9D6F8754-28E9-4940-B319-3FC8588CF18F}     18.5.0.0
+Microsoft SQL Server 2012 Native Client   {9D93D367-A2CC-4378-BD63-79EF3FE76C78}     11.4.7462.6
+Microsoft Web Deploy 4.0                  {DB7B43E1-BB6C-4417-9F20-2488FD8EECC8}     10.0.5402
+Windows SDK AddOn                         {E18618EC-D9DB-4BCE-B382-85ADA2CBB340}     10.1.0.0
+Microsoft Visual C++ 2010 x86 Redistribu… Microsoft.VC++2010Redist-x86               10.0.40219                  winget
+Python 3                                  Python.Python.3                            3.10.1150.0       3.10.415… winget
+Microsoft SQL Server Management Studio    Microsoft.SQLServerManagementStudio        15.0.18390.0      15.0.184… winget
+Microsoft Windows Desktop Runtime - 5 (x… Microsoft.dotnetRuntime.5-x64              5.0.14.30911      5.0.15.3… winget
+Microsoft Visual C++ 2013 Redistributabl… Microsoft.VC++2013Redist-x86               12.0.30501.0      12.0.406… winget
+Microsoft Visual Studio Tools for Applic… {f895a2f1-ae3f-4212-8af1-7fa1f8c212ea}     15.0.27520
