@@ -2,48 +2,48 @@
 :: ----------------------------------------------------------------------
 @echo off
 echo Installing 7Zip...
-winget install 7zip.7zip
+winget install --id 7zip.7zip --exact --silent
 
 echo Installing AnyDesk
-winget install AnyDeskSoftwareGmbH.AnyDesk
+winget install --id AnyDeskSoftwareGmbH.AnyDesk --exact --silent
 
 echo Installing Discord
-winget install Discord.Discord
+winget install --id Discord.Discord --exact --silent
 
 echo Installing Everything
-winget install Everything
+winget install --id Everything --exact --silent
 
 echo Installing f.lux
-winget install flux.flux
+winget install --id flux.flux --exact --silent
 
 echo Installing FastStone Image Viewer
-winget install FastStone.Viewer
+winget install --id FastStone.Viewer --exact --silent
 
 echo Installing Google Chrome
-winget install Google.Chrome
+winget install --id Google.Chrome --exact --silent
 
 echo Installing HWiNFO
-winget install REALiX.HWiNFO
+winget install --id REALiX.HWiNFO --exact --silent
 
 echo Installing Microsoft PowerToys
-winget install Microsoft.PowerToys
+winget install --id Microsoft.PowerToys --exact --silent
 
 echo Installing Plex
-winget install Plex.Plex
+winget install --id Plex.Plex --exact --silent
 
 echo Installing Spotify
-winget install Spotify.Spotify
+winget install --id Spotify.Spotify --exact --silent
 
 echo Installing STACK
-winget install TransIP.STACK
+winget install --id TransIP.STACK --exact --silent
 
 echo Installing Teams
-winget install Microsoft.Teams
+winget install --id Microsoft.Teams --exact --silent
 
 echo Installing VLC
-winget install VideoLAN.VLC
+winget install --id VideoLAN.VLC --exact --silent
 
 echo Installing WhatsApp
-winget install WhatsApp.WhatsApp
+winget install --id WhatsApp.WhatsApp --exact --silent
 
 pause

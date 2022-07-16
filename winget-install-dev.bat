@@ -2,24 +2,24 @@
 :: ----------------------------------------------------------------------
 @echo off
 echo Installing Git
-winget install Git.Git
+winget install --id Git.Git --exact --silent
 
 echo Installing GitHub Desktop
-winget install GitHub.GitHubDesktop
+winget install --id GitHub.GitHubDesktop --exact --silent
 
 echo Installing LINQPad 7
-winget install LINQPad.LINQPad.7
+winget install --id LINQPad.LINQPad.7 --exact --silent
 
 echo Installing Microsoft Visual Studio Code
-winget install Microsoft.VisualStudioCode
+winget install --id Microsoft.VisualStudioCode --exact --silent
 
 echo Installing Node.js LTS
-winget install OpenJS.NodeJS.LTS
+winget install --id OpenJS.NodeJS.LTS --exact --silent
 
 echo Installing Postman
-winget install Postman.Postman
+winget install --id Postman.Postman --exact --silent
 
 echo Installing Visual Studio Enterprise 2022
-winget install Microsoft.VisualStudio.2022.Enterprise
+winget install --id Microsoft.VisualStudio.2022.Enterprise --exact --silent
 
 pause

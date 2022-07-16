@@ -2,12 +2,12 @@
 :: ----------------------------------------------------------------------
 @echo off
 echo Installing Microsoft OneDrive
-winget install Microsoft.OneDrive
+winget install --id Microsoft.OneDrive --exact --silent
 
 echo Installing Slack
-winget install SlackTechnologies.Slack
+winget install --id SlackTechnologies.Slack --exact --silent
 
 echo Installing SoapUI
-winget install SmartBear.SoapUI
+winget install --id SmartBear.SoapUI --exact --silent
 
 pause
