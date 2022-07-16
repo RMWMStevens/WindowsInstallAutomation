@@ -5,7 +5,7 @@ echo Installing GOG Galaxy
 winget install GOG.Galaxy
 
 echo Installing Origin
-winget install Origin
+winget install ElectronicArts.EADesktop
 
 echo Installing Steam
 winget install Valve.Steam
