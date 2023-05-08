@@ -2,31 +2,31 @@
 :: ----------------------------------------------------------------------
 @echo off
 echo Uninstalling Cortana
-winget uninstall cortana --exact --silent
+winget uninstall cortana --silent
 
 echo Uninstalling Skype
-winget uninstall skype --exact --silent
+winget uninstall skype --silent
 
 echo Uninstalling Groove-Music
-winget uninstall Microsoft.ZuneMusic_8wekyb3d8bbwe --exact --silent
+winget uninstall Microsoft.ZuneMusic_8wekyb3d8bbwe --silent
 
 echo Uninstalling FeedBack-Hub
-winget uninstall Microsoft.WindowsFeedbackHub_8wekyb3d8bbwe --exact --silent
+winget uninstall Microsoft.WindowsFeedbackHub_8wekyb3d8bbwe --silent
 
 echo Uninstalling Microsoft-Tips
-winget uninstall Microsoft.Getstarted_8wekyb3d8bbwe --exact --silent
+winget uninstall Microsoft.Getstarted_8wekyb3d8bbwe --silent
 
 echo Uninstalling 3D-Viewer
-winget uninstall Microsoft.3DViewer_8wekyb3d8bbwe --exact --silent
-winget uninstall Microsoft.Microsoft3DViewer_8wekyb3d8bbwe  --exact --silent
+winget uninstall 3DViewer --exact --silent
+winget uninstall --exact --silent
 echo Uninstalling Microsoft Solitaire Collection
-winget uninstall Microsoft.MicrosoftSolitaireCollection_8wekyb3d8bbwe --exact --silent
+winget uninstall MicrosoftSolitaireCollection --exact --silent
 
 echo Uninstalling Paint-3D
-winget uninstall Microsoft.MSPaint_8wekyb3d8bbwe --exact --silent
+winget uninstall MSPaint --exact --silent
 
 echo Uninstalling MSN Weather
-winget uninstall Microsoft.BingWeather_8wekyb3d8bbwe --exact --silent
+winget uninstall Weather --exact --silent
 
 echo Uninstalling Mail & Calendar
 winget uninstall microsoft.windowscommunicationsapps_8wekyb3d8bbwe --exact --silent
