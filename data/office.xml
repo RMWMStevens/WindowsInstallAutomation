@@ -1,0 +1,26 @@
+<Configuration>
+  <!--
+    Office Deployment Tool configuration, used by the 'Microsoft 365' entry in
+    data\apps.psd1 (setup.exe /configure office.xml).
+
+    Product O365ProPlusRetail = Microsoft 365 Apps, the same product winget's
+    Microsoft.Office installs. For a Microsoft 365 Personal / Family licence use
+    O365HomePremRetail instead.
+
+    Reference: https://learn.microsoft.com/microsoft-365-apps/deploy/office-deployment-tool-configuration-options
+  -->
+  <Add OfficeClientEdition="64" Channel="Current">
+    <Product ID="O365ProPlusRetail">
+      <Language ID="en-us" />
+      <Language ID="nl-nl" />
+      <!-- OneDrive and Teams are removed by data\debloat.psd1 as well;
+           excluding them here stops Office from putting them straight back. -->
+      <ExcludeApp ID="OneDrive" />
+      <ExcludeApp ID="Groove" />  <!-- the old OneDrive for Business client -->
+      <ExcludeApp ID="Teams" />
+      <ExcludeApp ID="Lync" />    <!-- Skype for Business, Teams' predecessor -->
+    </Product>
+  </Add>
+  <Updates Enabled="TRUE" Channel="Current" />
+  <Display Level="None" AcceptEULA="TRUE" />
+</Configuration>
