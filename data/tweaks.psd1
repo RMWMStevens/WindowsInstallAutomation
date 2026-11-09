@@ -1,235 +1,107 @@
 @{
-    # Registry tweaks, applied by modules/20-registry.ps1.
+    # Registry settings, applied on every run. One block each:
     #
-    # Scope:   User    -> HKCU, applies to whoever runs the script
-    #          Machine -> HKLM, needs admin, applies to everyone
-    # Explorer: $true  -> Explorer must restart before the change shows
+    #   Key       the registry key (HKCU: = you, HKLM: = the whole PC)
+    #   Value     the value's name; leave it out for the key's (default) value
+    #   Data      what to set it to
+    #   Type      DWord unless stated
+    #   Explorer  $true = Explorer must restart before it shows (Setup offers to)
+    #   Why       what it is for -- in two years this is the only thing that
+    #             tells you whether a setting that stopped working still matters
     #
-    # Do NOT hand-write new entries from a blog post. Change the setting by
-    # hand first, find the key with Process Monitor or `reg export`, then add
-    # it here. See README.md -> "Adding a tweak".
+    # Do NOT copy a key from a blog post. Change the setting by hand first, find
+    # what changed (regedit, or Process Monitor), then add it here. Policies are
+    # the exception when Microsoft documents them -- say where in Why.
+    #
+    # To switch one off, wrap it in <# ... #>. That only stops it being set from
+    # now on; a PC that already has it keeps it until you change it back by hand.
     Tweaks = @(
 
-        # --- F1 help key ------------------------------------------------
-        @{
-            Name  = 'F1 opens nothing (64-bit apps)'
-            Why   = 'Stops the browser opening "Get help" every time F1 is hit by accident.'
-            Path  = 'HKCU:\Software\Classes\TypeLib\{8cec5860-07a1-11d9-b15e-000d56bfe6ee}\1.0\0\win64'
-            ValueName = ''
-            Value = ''
-            Type  = 'String'
-            Scope = 'User'
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'F1 opens nothing (32-bit apps)'
-            Why   = 'Same as above, for the 32-bit help handler.'
-            Path  = 'HKCU:\Software\Classes\TypeLib\{8cec5860-07a1-11d9-b15e-000d56bfe6ee}\1.0\0\win32'
-            ValueName = ''
-            Value = ''
-            Type  = 'String'
-            Scope = 'User'
-            Tags  = @('core')
-        }
+        # --- F1 ---------------------------------------------------------
+        @{ Name = 'F1 opens nothing (64-bit apps)'
+           Why  = 'Stops the browser opening "Get help" every time F1 is hit by accident.'
+           Key  = 'HKCU:\Software\Classes\TypeLib\{8cec5860-07a1-11d9-b15e-000d56bfe6ee}\1.0\0\win64'
+           Data = ''; Type = 'String' }
+        @{ Name = 'F1 opens nothing (32-bit apps)'
+           Why  = 'Same as above, for the 32-bit help handler.'
+           Key  = 'HKCU:\Software\Classes\TypeLib\{8cec5860-07a1-11d9-b15e-000d56bfe6ee}\1.0\0\win32'
+           Data = ''; Type = 'String' }
 
-        # --- Start menu / search web results -----------------------------
-        @{
-            Name  = 'No web suggestions in the search box'
-            Why   = 'The policy value. This is the one that still works on current builds.'
-            Path  = 'HKCU:\Software\Policies\Microsoft\Windows\Explorer'
-            ValueName = 'DisableSearchBoxSuggestions'
-            Value = 1
-            Type  = 'DWord'
-            Scope = 'User'
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'No Bing in Start search'
-            Why   = 'Older key. Kept because it costs nothing and helps on older builds.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
-            ValueName = 'BingSearchEnabled'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'No Cortana in search'
-            Why   = 'Older key, same reasoning as BingSearchEnabled.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
-            ValueName = 'CortanaConsent'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'No search highlights'
-            Why   = 'Removes the rotating "highlights" content from the search box.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\SearchSettings'
-            ValueName = 'IsDynamicSearchBoxEnabled'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Tags  = @('core')
-        }
+        # --- search -----------------------------------------------------
+        @{ Name = 'No web suggestions in the search box'
+           Why  = 'The policy value. This is the one that still works on current builds.'
+           Key  = 'HKCU:\Software\Policies\Microsoft\Windows\Explorer'
+           Value = 'DisableSearchBoxSuggestions'; Data = 1 }
+        @{ Name = 'No Bing in Start search'
+           Why  = 'Older key. Kept because it costs nothing and helps on older builds.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
+           Value = 'BingSearchEnabled'; Data = 0 }
+        @{ Name = 'No Cortana in search'
+           Why  = 'Older key, same reasoning as BingSearchEnabled.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
+           Value = 'CortanaConsent'; Data = 0 }
+        @{ Name = 'No search highlights'
+           Why  = 'Removes the rotating "highlights" content from the search box.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\SearchSettings'
+           Value = 'IsDynamicSearchBoxEnabled'; Data = 0 }
 
-        # --- Explorer ----------------------------------------------------
-		<# 
-        @{
-            Name  = 'Show file extensions'
-            Why   = 'Hidden extensions make it easy to run a .exe that looks like a .pdf.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'HideFileExt'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('core')
-        }
-		#>
-        @{
-            Name  = 'Show hidden files'
-            Why   = ''
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'Hidden'
-            Value = 1
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('personal', 'dev')
-        }
-        @{
-            Name  = 'Explorer opens on This PC'
-            Why   = 'Rather than Home / Quick access.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'LaunchTo'
-            Value = 1
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'Taskbar icons on the left'
-            Why   = 'Windows 10 layout.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'TaskbarAl'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('personal')
-        }
-        @{
-            Name  = 'Hide the widgets button'
-            Why   = 'Takes the news / weather widgets button off the taskbar.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'TaskbarDa'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'Hide the chat button'
-            Why   = 'Windows 11 21H2 / 22H2 only. 23H2 removed the button; elsewhere the value is ignored, so it is harmless to keep.'
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'TaskbarMn'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'Hide the task view button'
-            Why   = ''
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'ShowTaskViewButton'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('personal')
-        }
-		<#
-        @{
-            Name  = 'Seconds on the taskbar clock'
-            Why   = ''
-            Path  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-            ValueName = 'ShowSecondsInSystemClock'
-            Value = 1
-            Type  = 'DWord'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('personal')
-        }
-        @{
-            Name  = 'Full right-click menu (no "Show more options")'
-            Why   = 'Restores the Windows 10 context menu.'
-            Path  = 'HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32'
-            ValueName = ''
-            Value = ''
-            Type  = 'String'
-            Scope = 'User'
-            Explorer = $true
-            Tags  = @('core')
-        }
-		#>
+        # --- Explorer and taskbar ---------------------------------------
+        <#
+        @{ Name = 'Show file extensions'
+           Why  = 'Hidden extensions make it easy to run a .exe that looks like a .pdf.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'HideFileExt'; Data = 0; Explorer = $true }
+        #>
+        @{ Name = 'Show hidden files'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'Hidden'; Data = 1; Explorer = $true }
+        @{ Name = 'Explorer opens on This PC'
+           Why  = 'Rather than Home / Quick access.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'LaunchTo'; Data = 1; Explorer = $true }
+        @{ Name = 'Taskbar icons on the left'
+           Why  = 'Windows 10 layout.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'TaskbarAl'; Data = 0; Explorer = $true }
+        # Widgets: no setting here. Windows refuses scripts that write the "Allow
+        # widgets" policy (AllowNewsAndInterests -- "unauthorized operation", Nov
+        # 2026) and reportedly the button value (TaskbarDa) too, so remove.psd1
+        # removes the Widgets app itself. That also takes the button away.
+        @{ Name = 'Hide the chat button'
+           Why  = 'Windows 11 21H2 / 22H2 only. 23H2 removed the button; elsewhere the value is ignored, so it is harmless to keep.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'TaskbarMn'; Data = 0; Explorer = $true }
+        @{ Name = 'Hide the task view button'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'ShowTaskViewButton'; Data = 0; Explorer = $true }
+        <#
+        @{ Name = 'Seconds on the taskbar clock'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'ShowSecondsInSystemClock'; Data = 1; Explorer = $true }
+        @{ Name = 'Full right-click menu (no "Show more options")'
+           Why  = 'Restores the Windows 10 context menu.'
+           Key  = 'HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32'
+           Data = ''; Type = 'String'; Explorer = $true }
+        #>
 
-        # --- machine-wide (needs admin) ----------------------------------
-        @{
-            Name  = 'Widgets off entirely'
-            Why   = 'Group Policy "Allow widgets" = Disabled (documented by Microsoft as Policy CSP NewsAndInterests/AllowNewsAndInterests). Hiding the button leaves the widget board running in the background (~85 MB on my PC); this stops it, and Win+W with it. Pro / Education / Enterprise; Home ignores it, so the button tweak above stays.'
-            Path  = 'HKLM:\SOFTWARE\Policies\Microsoft\Dsh'
-            ValueName = 'AllowNewsAndInterests'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'Machine'
-            Explorer = $true
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'No sponsored apps or Start suggestions'
-            Why   = 'Group Policy "Turn off Microsoft consumer experiences" (Policy CSP Experience/AllowWindowsConsumerFeatures). Stops Windows installing promoted apps and adding Start pins after sign-in. Education / Enterprise only -- Home and Pro ignore it.'
-            Path  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
-            ValueName = 'DisableWindowsConsumerFeatures'
-            Value = 1
-            Type  = 'DWord'
-            Scope = 'Machine'
-            Tags  = @('core')
-        }
-        @{
-            Name  = 'Recall not allowed'
-            Why   = 'Group Policy "Allow Recall to be enabled" = Disabled (Policy CSP WindowsAI/AllowRecallEnablement). Microsoft: Recall is disabled, its bits removed and any snapshots deleted, after a restart. Copilot+ PCs, 24H2 build 26100.3915+, Pro / Education / Enterprise. debloat.psd1 removes the feature too, which also covers Home.'
-            Path  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
-            ValueName = 'AllowRecallEnablement'
-            Value = 0
-            Type  = 'DWord'
-            Scope = 'Machine'
-            Tags  = @('personal')
-        }
-        @{
-            Name  = 'Long path support'
-            Why   = 'Lets tools handle paths over 260 characters. Saves pain with node_modules.'
-            Path  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
-            ValueName = 'LongPathsEnabled'
-            Value = 1
-            Type  = 'DWord'
-            Scope = 'Machine'
-            Tags  = @('dev')
-        }
-        @{
-            Name  = 'Verbose startup and shutdown messages'
-            Why   = 'Says what Windows is actually waiting on during a slow boot.'
-            Path  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
-            ValueName = 'VerboseStatus'
-            Value = 1
-            Type  = 'DWord'
-            Scope = 'Machine'
-            Tags  = @('dev')
-        }
+        # --- policies documented by Microsoft (whole PC) ----------------
+        @{ Name = 'No sponsored apps or Start suggestions'
+           Why  = 'Group Policy "Turn off Microsoft consumer experiences" (Policy CSP Experience/AllowWindowsConsumerFeatures). Stops Windows installing promoted apps and adding Start pins after sign-in. Education / Enterprise only -- Home and Pro ignore it.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
+           Value = 'DisableWindowsConsumerFeatures'; Data = 1 }
+        @{ Name = 'Recall not allowed'
+           Why  = 'Group Policy "Allow Recall to be enabled" = Disabled (Policy CSP WindowsAI/AllowRecallEnablement). Microsoft: Recall is disabled, its files removed and any snapshots deleted, after a restart. Copilot+ PCs, 24H2 build 26100.3915+.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+           Value = 'AllowRecallEnablement'; Data = 0 }
+
+        # --- whole PC ---------------------------------------------------
+        @{ Name = 'Long path support'
+           Why  = 'Lets tools handle paths over 260 characters. Saves pain with node_modules.'
+           Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
+           Value = 'LongPathsEnabled'; Data = 1 }
+        @{ Name = 'Verbose startup and shutdown messages'
+           Why  = 'Says what Windows is actually waiting on during a slow boot.'
+           Key  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+           Value = 'VerboseStatus'; Data = 1 }
     )
 }

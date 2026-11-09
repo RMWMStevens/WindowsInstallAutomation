@@ -1,7 +1,7 @@
 # Still to do by hand
 
 Things a script should not do: anything needing a password, a licence key, or a
-decision. `Setup.ps1` prints every unticked line below when it finishes.
+decision. Setup points you here when it finishes.
 
 Copy this file per machine if you want to actually tick things off, or just use
 it as a read-through checklist.
@@ -15,9 +15,7 @@ it as a read-through checklist.
 
 ## Microsoft Store
 
-- [ ] Sign in to the Store once. WhatsApp, Spotify and Twinkle Tray come from
-      the Store, so they can fail on a fresh machine until an account is
-      signed in. Re-run `.\Setup.ps1 -Profile Mine -Only apps` afterwards.
+- [ ] Store apps failed (WhatsApp, Spotify, Twinkle Tray)? Sign in to the Store, run Setup.cmd again, pick them again
 
 ## Licences
 
@@ -39,6 +37,7 @@ it as a read-through checklist.
 - [ ] Audio devices, default output
 - [ ] Printer
 - [ ] Power plan -- laptops especially
+- [ ] HWiNFO: if you want it at login, turn on Auto Start in its settings (sensors-only)
 
 ## Things worth checking after a run
 
@@ -47,7 +46,6 @@ it as a read-through checklist.
 - [ ] Start menu search returns no web results
 - [ ] Win+W does nothing after a reboot (widgets fully off)
 - [ ] Copilot+ PC: after a reboot, Settings > Privacy & security has no "Recall & snapshots"
-- [ ] HWiNFO starts on login in sensors-only mode without a UAC prompt
 
 ## Not worth automating
 

@@ -1,151 +1,119 @@
 <#
 .SYNOPSIS
-    Sets up a fresh Windows 11 install: apps, registry tweaks, app config.
+    Sets up Windows 11 the way I want it. Start it with Setup.cmd.
 
 .DESCRIPTION
-    Safe to run more than once. Every step checks the current state first and
-    only changes what is actually different, so a second run is nearly a no-op.
+    Four steps, top to bottom:
+      1. Install apps       you pick them from the list in data\apps.psd1
+      2. Remove apps        everything in data\remove.psd1
+      3. Registry settings  everything in data\tweaks.psd1
+      4. Summary            what changed and what failed; then read MANUAL.md
 
-.PARAMETER Profile
-    Which set of tags to apply. See $Profiles below.
+    Run it as often as you like. Every step checks first and only changes what
+    is different, so a second run just removes whatever has come back.
 
-.PARAMETER Tags
-    Use tags directly instead of a profile.
-
-.PARAMETER Only
-    Run only these modules: apps, debloat, registry, config.
-
-.PARAMETER Skip
-    Skip these modules.
+.PARAMETER Apps
+    Skip the menu. Same input as the menu: all, none, group names, numbers or
+    ranges -- e.g.  -Apps core,social   or   -Apps none
 
 .EXAMPLE
-    .\Setup.ps1 -Profile Mine -WhatIf
-    Shows everything it would do, changes nothing. Always start here.
-
-.EXAMPLE
-    .\Setup.ps1 -Profile Friend
-
-.EXAMPLE
-    .\Setup.ps1 -Profile Mine -Only registry
+    .\Setup.cmd -WhatIf
+    Shows everything it would do and changes nothing.
 #>
+#Requires -Version 5.1
+#Requires -PSEdition Desktop
 [CmdletBinding(SupportsShouldProcess)]
-param(
-    [ValidateSet('Mine', 'Friend', 'Minimal', 'MediaTools')]
-    [string]$Profile = 'Mine',
+param([string[]]$Apps)
 
-    [string[]]$Tags,
+. (Join-Path $PSScriptRoot 'tools\Helpers.ps1')
 
-    [ValidateSet('apps', 'debloat', 'registry', 'config')]
-    [string[]]$Only,
-
-    [ValidateSet('apps', 'debloat', 'registry', 'config')]
-    [string[]]$Skip = @(),
-
-    [switch]$NoElevate
-)
-
-$ErrorActionPreference = 'Stop'
-$RepoRoot = $PSScriptRoot
-
-# Tag sets per profile. 'nogaming' is what turns Xbox removal on.
-# MediaTools is an add-on: it only installs the media tools, run it on its own.
-$Profiles = @{
-    Mine       = @('core', 'comms', 'media', 'personal', 'dev', 'gaming')
-    Friend     = @('core', 'comms', 'media', 'nogaming')
-    Minimal    = @('core')
-    MediaTools = @('mediatools')
+# A dry run may go without admin; a real one needs it for the whole-PC parts.
+if (-not (Test-IsAdmin) -and -not $WhatIfPreference) {
+    Write-Host 'Setup needs admin rights. Start it with Setup.cmd, which asks for them.' -ForegroundColor Red
+    exit 1
 }
 
-if (-not $Tags) { $Tags = $Profiles[$Profile] }
+$data     = Join-Path $PSScriptRoot 'data'
+$appList  = (Import-PowerShellDataFile "$data\apps.psd1" -ErrorAction Stop).Apps
+$removals = (Import-PowerShellDataFile "$data\remove.psd1" -ErrorAction Stop).Remove
+$tweaks   = (Import-PowerShellDataFile "$data\tweaks.psd1" -ErrorAction Stop).Tweaks
 
-$modules = [ordered]@{
-    apps     = '10-apps.ps1'
-    debloat  = '15-debloat.ps1'
-    registry = '20-registry.ps1'
-    config   = '30-app-config.ps1'
-}
-
-$toRun = $modules.Keys | Where-Object {
-    (-not $Only -or $Only -contains $_) -and ($Skip -notcontains $_)
-}
-
-Import-Module (Join-Path $RepoRoot 'lib\Common.psm1') -Force -Global
-
-# Propagate -WhatIf into the helper functions, which all use ShouldProcess.
-$global:WhatIfPreference = [bool]$WhatIfPreference
-
-Start-SetupLog (Join-Path $RepoRoot "logs\setup-$(Get-Date -Format 'yyyyMMdd-HHmmss').log")
-
+Start-Log (Join-Path $PSScriptRoot "logs\setup-$(Get-Date -Format 'yyyyMMdd-HHmmss').log")
 Write-Host ''
 Write-Host '  Windows setup' -ForegroundColor Cyan
-Write-Host "  profile : $Profile" -ForegroundColor Gray
-Write-Host "  tags    : $($Tags -join ', ')" -ForegroundColor Gray
-Write-Host "  modules : $($toRun -join ', ')" -ForegroundColor Gray
 if ($WhatIfPreference) { Write-Host '  DRY RUN -- nothing will be changed' -ForegroundColor Yellow }
-
-# Windows 11 only. Not blocked, because it mostly still works on 10, but
-# nothing here is tested or tuned for it.
 if ([Environment]::OSVersion.Version.Build -lt 22000) {
-    Write-Log 'This is Windows 10. The script is written for Windows 11 -- it will run, but untested, and some tweaks do nothing here.' -Level Warn
+    Write-Log 'This is Windows 10. Setup is written for Windows 11 -- it will run, but untested.' -Level Warn
 }
 
-# --- elevation ---------------------------------------------------------------
-if (-not (Test-IsAdmin) -and -not $NoElevate -and -not $WhatIfPreference) {
-    Write-Log 'Not running as admin. Machine-wide tweaks and scheduled tasks will be skipped.' -Level Warn
-    $answer = Read-Host '  Restart elevated? [Y/n]'
-    if ($answer -notmatch '^[nN]') {
-        $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"",
-            '-Profile', $Profile, '-NoElevate')
-        if ($Only) { $argList += @('-Only', ($Only -join ',')) }
-        if ($Skip) { $argList += @('-Skip', ($Skip -join ',')) }
-        Start-Process -FilePath (Get-Process -Id $PID).Path -Verb RunAs -ArgumentList $argList
-        return
+
+# === 1. Install apps =========================================================
+Write-Log 'Install apps' -Level Step
+
+$chosen = @(Select-Apps -Apps $appList -Choice $Apps)
+$haveWinget = $false
+if ($chosen | Where-Object { $_.Id }) { $haveWinget = Initialize-Winget }
+
+foreach ($app in $chosen) {
+    if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
+
+    if ($app.Url) {
+        Install-FromUrl -Name $app.Name -Url $app.Url -Signer $app.Signer -Detect $app.Detect -Ask:([bool]$app.Ask) `
+            -Arguments ("$($app.Args)".Replace('{data}', $data))
+    }
+    elseif ($haveWinget) {
+        $source = if ($app.Source) { $app.Source } else { 'winget' }
+        Install-WingetApp -Id $app.Id -Name $app.Name -Source $source -Ask:([bool]$app.Ask)
     }
 }
+if (-not $chosen) { Write-Log 'Nothing picked.' }
 
-# --- run ---------------------------------------------------------------------
-foreach ($key in $toRun) {
-    $path = Join-Path $RepoRoot "modules\$($modules[$key])"
-    if (-not (Test-Path $path)) {
-        Write-Log "module missing: $path" -Level Fail
-        continue
+
+# === 2. Remove apps ==========================================================
+Write-Log 'Remove apps' -Level Step
+
+foreach ($r in $removals) {
+    if ($r.Guard -eq 'OneDriveFolders') {
+        $held = @(Get-FoldersInOneDrive) -join ', '
+        if ($held) {
+            Write-Log "$($r.Name) -- refused, these folders are backed up into OneDrive: $held. In OneDrive settings > Sync and backup > Manage back up, stop backing them up, then run Setup again." -Level Fail
+            Add-Result -Step 'remove' -Name $r.Name -Status Failed -Detail "folders still in OneDrive: $held"
+            continue
+        }
     }
-    try {
-        & $path -Tags $Tags -RepoRoot $RepoRoot
-    }
-    catch {
-        Write-Log "module '$key' stopped: $($_.Exception.Message)" -Level Fail
-        Add-Result -Area $key -Name 'module' -Status Failed -Detail $_.Exception.Message
-    }
+
+    if ($r.Feature)       { Disable-OptionalFeature -Feature $r.Feature -Name $r.Name }
+    elseif ($r.Uninstall) { Remove-DesktopApp -DisplayName $r.Uninstall -Name $r.Name -StopProcess $r.StopProcess }
+    else                  { Remove-StoreApp -Package $r.Package -Name $r.Name }
 }
 
-# --- finish ------------------------------------------------------------------
+
+# === 3. Registry settings ====================================================
+Write-Log 'Registry settings' -Level Step
+Write-Log "Windows build $([Environment]::OSVersion.Version.Build). Keys move between releases; if one stops working, re-capture it."
+
+$restartExplorer = $false
+foreach ($t in $tweaks) {
+    $type = if ($t.Type) { $t.Type } else { 'DWord' }
+    $changed = Set-RegValue -Key $t.Key -Value "$($t.Value)" -Data $t.Data -Type $type -Label $t.Name
+    if ($changed -and $t.Explorer) { $restartExplorer = $true }
+}
+
+
+# === 4. Summary ==============================================================
 Show-Summary
 
-if (Test-ExplorerRestartWanted -and -not $WhatIfPreference) {
+if ($restartExplorer) {
     Write-Host ''
-    $answer = Read-Host '  Restart Explorer now to apply the taskbar and Explorer changes? [Y/n]'
-    if ($answer -notmatch '^[nN]') {
+    if ((Read-Host '  Restart Explorer now so the taskbar and Explorer changes show? [Y/n]') -notmatch '^[nN]') {
         Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
         Write-Log 'Explorer restarted.' -Level Ok
     }
 }
 
-$manual = Join-Path $RepoRoot 'MANUAL.md'
-if (Test-Path $manual) {
-    Write-Host ''
-    Write-Host ('=' * 62) -ForegroundColor Yellow
-    Write-Host ' Still to do by hand' -ForegroundColor Yellow
-    Write-Host ('=' * 62) -ForegroundColor Yellow
-    Get-Content $manual | Where-Object { $_ -match '^\s*- \[ \]' } | ForEach-Object {
-        Write-Host "  $($_.Trim())"
-    }
-    Write-Host ''
-    Write-Host " Full list: $manual"
-}
+Write-Host ''
+Write-Host ' Next: read MANUAL.md for what is left to do by hand.' -ForegroundColor Yellow
+Write-Host " $(Join-Path $PSScriptRoot 'MANUAL.md')" -ForegroundColor Yellow
 
-$global:WhatIfPreference = $false
-
-# Exit non-zero if anything failed, and never leak winget's exit code.
-$failures = Get-FailureCount
-exit ([int]($failures -gt 0))
+# Non-zero exit when anything failed.
+exit ([int](@($script:Results | Where-Object Status -eq 'Failed').Count -gt 0))

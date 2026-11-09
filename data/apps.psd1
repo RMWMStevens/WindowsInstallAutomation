@@ -1,91 +1,69 @@
 @{
-    # One entry per app. Adding an app is one line.
+    # Every app Setup can install. Setup shows them as a numbered list, grouped
+    # by Group, and you pick what you want -- nothing is installed unless picked.
     #
-    # Tags drive the profiles in Setup.ps1:
-    #   core       -- goes on every machine, including other people's
-    #   comms      -- chat / calls
-    #   media      -- music, video, images
-    #   personal   -- my own machines only
-    #   dev        -- development
-    #   gaming     -- game launchers
-    #   mediatools -- ripping / editing audio and video. Not part of any other
-    #                 profile; install with:  .\Setup.ps1 -Profile MediaTools
+    #   Id      winget package ID. Find it with:  winget search "<name>"
+    #   Source  'msstore' for Store apps. Also use the Store build when that is
+    #           the one you already have: winget sees the Store build and the
+    #           winget build as two different apps and would install both.
+    #   Ask     $true = ask once more before installing (big or licensed apps)
+    #   Note    printed when the app is installed
     #
-    # Find an exact ID with:  winget search "<name>"
-    # Check every ID still resolves with:  .\tools\Test-AppIds.ps1
+    # Check every ID still exists with:  .\tools\Test-AppIds.ps1
     #
-    # Source defaults to 'winget'; set it to 'msstore' for Store-only apps, and
-    # for apps whose Store build is the one already installed. winget treats the
-    # Store build and the winget build as two different apps, so pointing at the
-    # other one installs a second copy next to it.
-    #
-    # An app winget cannot install reliably is downloaded directly instead:
-    #   Url    -- the installer, fetched fresh on every install
-    #   Signer -- O= of the Authenticode signature; any other signer is refused
-    #   Args   -- installer arguments; {data} becomes the path of this data\ folder
-    #   Detect -- DisplayName in Settings > Apps (wildcards ok) meaning "installed"
+    # An app winget cannot install reliably can be downloaded directly instead,
+    # with Url / Signer / Args / Detect -- see Microsoft 365 below. Apps that are
+    # in neither winget nor the Store (FileZilla, say) are not listed here.
     Apps = @(
-        # --- core -------------------------------------------------------
-        @{ Id = '7zip.7zip';                       Name = '7-Zip';                 Tags = @('core') }
-        @{ Id = 'voidtools.Everything';            Name = 'Everything';            Tags = @('core') }
-        @{ Id = 'VideoLAN.VLC';                    Name = 'VLC';                   Tags = @('core') }
-        @{ Id = 'AnyDesk.AnyDesk';                 Name = 'AnyDesk';               Tags = @('core') }
-        @{ Id = 'Microsoft.PowerToys';             Name = 'PowerToys';             Tags = @('core') }
-        @{ Id = '9PLJWWSV01LK';                    Name = 'Twinkle Tray';          Tags = @('core')
-           Source = 'msstore' }
+        @{ Group = 'Core'; Name = '7-Zip';          Id = '7zip.7zip' }
+        @{ Group = 'Core'; Name = 'Everything';     Id = 'voidtools.Everything' }
+        @{ Group = 'Core'; Name = 'VLC';            Id = 'VideoLAN.VLC' }
+        @{ Group = 'Core'; Name = 'HWiNFO';         Id = 'REALiX.HWiNFO' }
+        @{ Group = 'Core'; Name = 'CPU-Z';          Id = 'CPUID.CPU-Z' }
+        # Not winget's Microsoft.Office: that package checks this same setup.exe
+        # against a stored hash and fails every time Microsoft updates the file.
+        @{ Group = 'Core'; Name = 'Microsoft 365';  Ask = $true
+           Url    = 'https://officecdn.microsoft.com/pr/wsus/setup.exe'   # Office Deployment Tool
+           Signer = 'Microsoft Corporation'        # refused unless signed by this publisher
+           Args   = '/configure "{data}\office.xml"'   # {data} = this folder
+           Detect = 'Microsoft 365*'               # name in Settings > Apps once installed
+           Note   = 'Word, Excel and PowerPoint only (data\office.xml). Sign in afterwards -- see MANUAL.md' }
 
-        # --- comms ------------------------------------------------------
-        @{ Id = '9NKSQGP7F2NH';                    Name = 'WhatsApp';              Tags = @('comms')
-           Source = 'msstore'
-           Note = 'Store-only. Needs a signed-in Microsoft account, so it may fail on a fresh machine -- see MANUAL.md' }
-        @{ Id = 'Discord.Discord';                 Name = 'Discord';               Tags = @('comms', 'personal') }
-        @{ Id = 'OpenWhisperSystems.Signal';       Name = 'Signal';                Tags = @('comms') }
+        @{ Group = 'Social'; Name = 'WhatsApp';     Id = '9NKSQGP7F2NH'; Source = 'msstore' }
+        @{ Group = 'Social'; Name = 'Discord';      Id = 'Discord.Discord' }
+        @{ Group = 'Social'; Name = 'Signal';       Id = 'OpenWhisperSystems.Signal' }
 
-        # --- media ------------------------------------------------------
-        @{ Id = '9NCBCSZSJRSB';                    Name = 'Spotify';               Tags = @('media')
-           Source = 'msstore' }
-        @{ Id = 'Plex.Plex';                       Name = 'Plex';                  Tags = @('media', 'personal') }
+        @{ Group = 'Tools'; Name = 'AnyDesk';       Id = 'AnyDesk.AnyDesk' }
+        @{ Group = 'Tools'; Name = 'Twinkle Tray';  Id = '9PLJWWSV01LK'; Source = 'msstore' }
+        @{ Group = 'Tools'; Name = 'PowerToys';     Id = 'Microsoft.PowerToys' }
 
-        # --- personal ---------------------------------------------------
-        @{ Id = 'REALiX.HWiNFO';                   Name = 'HWiNFO';                Tags = @('personal')
-           Note = 'Configured by modules/30-app-config.ps1' }
-        @{ Id = 'TransIP.STACK';                   Name = 'TransIP STACK';         Tags = @('personal') }
-        @{ Id = 'CPUID.CPU-Z';                     Name = 'CPU-Z';                 Tags = @('personal') }
-        @{ Id = 'JonasJohn.RED.Beta';              Name = 'Remove Empty Directories'; Tags = @('personal') }
-        @{ Id = 'Google.QuickShare';               Name = 'Quick Share';           Tags = @('personal') }
-        @{ Id = 'Notion.Notion';                   Name = 'Notion';                Tags = @('personal') }
-        @{ Id = 'Mozilla.Firefox.DeveloperEdition'; Name = 'Firefox Developer Edition'; Tags = @('personal') }
-        # Not the winget package (Microsoft.Office): that one points at this same
-        # setup.exe by hash, and breaks every time Microsoft updates the file before
-        # the manifest catches up. This is the official Office Deployment Tool.
-        @{ Name = 'Microsoft 365';                                                 Tags = @('personal')
-           Url    = 'https://officecdn.microsoft.com/pr/wsus/setup.exe'
-           Signer = 'Microsoft Corporation'
-           Args   = '/configure "{data}\office.xml"'
-           Detect = 'Microsoft 365*'
-           Note   = 'Installed without OneDrive and Teams (data\office.xml). Sign in afterwards -- see MANUAL.md' }
+        @{ Group = 'Media'; Name = 'Plex';          Id = 'Plex.Plex' }
+        @{ Group = 'Media'; Name = 'Spotify';       Id = '9NCBCSZSJRSB'; Source = 'msstore' }
 
-        # --- dev --------------------------------------------------------
-        @{ Id = 'Git.Git';                         Name = 'Git';                   Tags = @('dev') }
-        @{ Id = 'GitHub.GitHubDesktop';            Name = 'GitHub Desktop';        Tags = @('dev') }
-        @{ Id = 'Microsoft.VisualStudioCode';      Name = 'VS Code';               Tags = @('dev') }
-        @{ Id = 'OpenJS.NodeJS.LTS';               Name = 'Node.js LTS';           Tags = @('dev') }
-        @{ Id = 'Postman.Postman';                 Name = 'Postman';               Tags = @('dev') }
-        @{ Id = 'Microsoft.VisualStudio.Community'; Name = 'Visual Studio Community 2026'; Tags = @('dev')
+        @{ Group = 'Personal'; Name = 'Quick Share';               Id = 'Google.QuickShare' }
+        @{ Group = 'Personal'; Name = 'Firefox Developer Edition'; Id = 'Mozilla.Firefox.DeveloperEdition' }
+        @{ Group = 'Personal'; Name = 'TransIP STACK';             Id = 'TransIP.STACK' }
+        @{ Group = 'Personal'; Name = 'Notion';                    Id = 'Notion.Notion' }
+
+        @{ Group = 'Dev'; Name = 'Git';             Id = 'Git.Git' }
+        @{ Group = 'Dev'; Name = 'GitHub Desktop';  Id = 'GitHub.GitHubDesktop' }
+        @{ Group = 'Dev'; Name = 'VS Code';         Id = 'Microsoft.VisualStudioCode' }
+        @{ Group = 'Dev'; Name = 'Node.js LTS';     Id = 'OpenJS.NodeJS.LTS' }
+        @{ Group = 'Dev'; Name = 'Postman';         Id = 'Postman.Postman' }
+        @{ Group = 'Dev'; Name = 'Visual Studio Community 2026'; Id = 'Microsoft.VisualStudio.Community'
            Note = 'Large download. Sign in with a Microsoft account within 30 days -- see MANUAL.md' }
 
-        # --- gaming -----------------------------------------------------
-        @{ Id = 'Valve.Steam';                     Name = 'Steam';                 Tags = @('gaming') }
-        @{ Id = 'GOG.Galaxy';                      Name = 'GOG Galaxy';            Tags = @('gaming') }
-        @{ Id = 'ElectronicArts.EADesktop';        Name = 'EA Desktop';            Tags = @('gaming') }
-        @{ Id = 'Ubisoft.Connect';                 Name = 'Ubisoft Connect';       Tags = @('gaming') }
+        @{ Group = 'Gaming'; Name = 'Steam';           Id = 'Valve.Steam' }
+        @{ Group = 'Gaming'; Name = 'GOG Galaxy';      Id = 'GOG.Galaxy' }
+        @{ Group = 'Gaming'; Name = 'EA app';          Id = 'ElectronicArts.EADesktop' }
+        @{ Group = 'Gaming'; Name = 'Ubisoft Connect'; Id = 'Ubisoft.Connect' }
 
-        # --- mediatools (separate run: .\Setup.ps1 -Profile MediaTools) -
-        @{ Id = 'Audacity.Audacity';               Name = 'Audacity';              Tags = @('mediatools') }
-        @{ Id = 'HandBrake.HandBrake';             Name = 'HandBrake';             Tags = @('mediatools') }
-        @{ Id = 'MoritzBunkus.MKVToolNix';         Name = 'MKVToolNix';            Tags = @('mediatools') }
-        @{ Id = 'GuinpinSoft.MakeMKV';             Name = 'MakeMKV';               Tags = @('mediatools') }
-        @{ Id = 'AndreWiethoff.ExactAudioCopy';    Name = 'Exact Audio Copy';      Tags = @('mediatools') }
-        @{ Id = 'XnSoft.XnConvert';                Name = 'XnConvert';             Tags = @('mediatools') }
+        @{ Group = 'MediaTools'; Name = 'Remove Empty Directories'; Id = 'JonasJohn.RED.Beta' }
+        @{ Group = 'MediaTools'; Name = 'HandBrake';        Id = 'HandBrake.HandBrake' }
+        @{ Group = 'MediaTools'; Name = 'Audacity';         Id = 'Audacity.Audacity' }
+        @{ Group = 'MediaTools'; Name = 'MKVToolNix';       Id = 'MoritzBunkus.MKVToolNix' }
+        @{ Group = 'MediaTools'; Name = 'MakeMKV';          Id = 'GuinpinSoft.MakeMKV' }
+        @{ Group = 'MediaTools'; Name = 'Exact Audio Copy'; Id = 'AndreWiethoff.ExactAudioCopy' }
+        @{ Group = 'MediaTools'; Name = 'XnConvert';        Id = 'XnSoft.XnConvert' }
     )
 }
