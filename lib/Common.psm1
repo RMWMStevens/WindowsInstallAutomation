@@ -311,6 +311,50 @@ function Remove-Win32App {
     }
 }
 
+# Turns off a Windows optional feature and removes its files -- Microsoft's own
+# documented way to strip Recall. Absent features (not a Copilot+ PC, say) are
+# treated as already gone.
+function Disable-OptionalFeature {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Feature,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    if (-not (Test-IsAdmin)) {
+        Write-Log "$Name -- needs admin, re-run elevated" -Level Warn
+        Add-Result -Area 'debloat' -Name $Name -Status Skipped -Detail 'needs admin'
+        return
+    }
+
+    $state = $null
+    try { $state = (Get-WindowsOptionalFeature -Online -FeatureName $Feature -ErrorAction Stop).State } catch { }
+
+    if (-not $state -or "$state" -like 'Disable*') {
+        $why = if ($state) { "already $state" } else { 'not on this PC' }
+        Write-Log "$Name -- $why" -Level Skip
+        Add-Result -Area 'debloat' -Name $Name -Status AlreadySet
+        return
+    }
+
+    if ($WhatIfPreference) {
+        Write-Log "$Name -- would turn off and remove (currently $state)" -Level Info
+        Add-Result -Area 'debloat' -Name $Name -Status Skipped -Detail 'WhatIf'
+        return
+    }
+
+    try {
+        $r = Disable-WindowsOptionalFeature -Online -FeatureName $Feature -Remove -NoRestart -ErrorAction Stop
+        $detail = if ($r.RestartNeeded) { 'restart to finish' } else { '' }
+        Write-Log "$Name -- removed$(if ($detail) { " ($detail)" })" -Level Ok
+        Add-Result -Area 'debloat' -Name $Name -Status Changed -Detail $detail
+    }
+    catch {
+        Write-Log "$Name -- $($_.Exception.Message)" -Level Fail
+        Add-Result -Area 'debloat' -Name $Name -Status Failed -Detail $_.Exception.Message
+    }
+}
+
 function Remove-AppxApp {
     [CmdletBinding()]
     param(

@@ -8,6 +8,8 @@
     #                Settings > Apps (wildcards ok). Runs the program's own
     #                uninstaller; MSI packages run fully silent.
     #                StopProcess lists processes to close first.
+    #   Feature   -- a Windows optional feature ("Turn Windows features on or
+    #                off"), turned off and its files removed. Needs admin.
     #
     # Guard = 'OneDriveFolders' refuses the removal while Desktop, Documents or
     # another user folder is backed up into OneDrive. Uninstalling then would
@@ -33,8 +35,14 @@
         @{ Name = 'To Do';               Pattern = 'Microsoft.Todos';                        Tags = @('core') }
         @{ Name = 'Feedback Hub';        Pattern = 'Microsoft.WindowsFeedbackHub';           Tags = @('core') }
         @{ Name = 'Maps';                Pattern = 'Microsoft.WindowsMaps';                  Tags = @('core') }
+        @{ Name = 'Movies & TV';         Pattern = 'Microsoft.ZuneVideo';                    Tags = @('core') }
         @{ Name = 'Mail & Calendar';     Pattern = 'microsoft.windowscommunicationsapps';    Tags = @('core') }
         @{ Name = 'Cortana';             Pattern = 'Microsoft.549981C3F5F10';                Tags = @('core') }
+        # Widgets are switched off by the 'Widgets off entirely' policy in
+        # tweaks.psd1; this is the news feed that kept running for them.
+        @{ Name = 'Microsoft Start feed'; Pattern = 'Microsoft.StartExperiencesApp';         Tags = @('core') }
+        # Web results in Windows search -- off already via DisableSearchBoxSuggestions.
+        @{ Name = 'Microsoft Bing';      Pattern = 'Microsoft.BingSearch';                   Tags = @('core') }
 
         # OneDrive and Teams -- gone on every machine, every part of them.
         # data\office.xml keeps Microsoft 365 from installing them again.
@@ -51,6 +59,16 @@
         @{ Name = 'Sticky Notes';        Pattern = 'Microsoft.MicrosoftStickyNotes';         Tags = @('personal') }
         @{ Name = 'New Outlook';         Pattern = 'Microsoft.OutlookForWindows';            Tags = @('personal') }
         @{ Name = 'Quick Assist';        Pattern = 'MicrosoftCorporationII.QuickAssist';     Tags = @('personal') }
+        @{ Name = 'Phone Link';          Pattern = 'Microsoft.YourPhone';                    Tags = @('personal') }
+        @{ Name = 'Mobile devices';      Pattern = 'MicrosoftWindows.CrossDevice';           Tags = @('personal')
+           Note = 'The background half of Phone Link. Google Quick Share is separate and unaffected.' }
+        @{ Name = 'Copilot';             Pattern = 'Microsoft.Copilot';                      Tags = @('personal') }
+        @{ Name = 'Microsoft 365 companions'; Pattern = 'Microsoft.M365Companions';          Tags = @('personal')
+           Note = 'Microsoft 365 can put this back on update; the next run removes it again.' }
+        @{ Name = 'Family Safety';       Pattern = 'MicrosoftCorporationII.MicrosoftFamily'; Tags = @('personal') }
+        # Copilot+ PCs only; on anything else the feature does not exist. The
+        # 'Recall not allowed' policy in tweaks.psd1 keeps it from coming back.
+        @{ Name = 'Recall';              Feature = 'Recall';                                 Tags = @('personal') }
 
         # Xbox parts -- removed on non-gaming machines only, so they are
         # tagged so that the Gaming profile keeps them.

@@ -102,6 +102,11 @@ foreach ($app in $selected) {
 
     if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
 
+    if ($app.Feature) {
+        Disable-OptionalFeature -Feature $app.Feature -Name $app.Name
+        continue
+    }
+
     if ($app.Uninstall) {
         $removeArgs = @{ DisplayName = $app.Uninstall; Name = $app.Name }
         if ($app.StopProcess) { $removeArgs.StopProcess = $app.StopProcess }

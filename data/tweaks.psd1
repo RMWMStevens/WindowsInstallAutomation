@@ -181,6 +181,37 @@
 
         # --- machine-wide (needs admin) ----------------------------------
         @{
+            Name  = 'Widgets off entirely'
+            Why   = 'Group Policy "Allow widgets" = Disabled (documented by Microsoft as Policy CSP NewsAndInterests/AllowNewsAndInterests). Hiding the button leaves the widget board running in the background (~85 MB on my PC); this stops it, and Win+W with it. Pro / Education / Enterprise; Home ignores it, so the button tweak above stays.'
+            Path  = 'HKLM:\SOFTWARE\Policies\Microsoft\Dsh'
+            ValueName = 'AllowNewsAndInterests'
+            Value = 0
+            Type  = 'DWord'
+            Scope = 'Machine'
+            Explorer = $true
+            Tags  = @('core')
+        }
+        @{
+            Name  = 'No sponsored apps or Start suggestions'
+            Why   = 'Group Policy "Turn off Microsoft consumer experiences" (Policy CSP Experience/AllowWindowsConsumerFeatures). Stops Windows installing promoted apps and adding Start pins after sign-in. Education / Enterprise only -- Home and Pro ignore it.'
+            Path  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
+            ValueName = 'DisableWindowsConsumerFeatures'
+            Value = 1
+            Type  = 'DWord'
+            Scope = 'Machine'
+            Tags  = @('core')
+        }
+        @{
+            Name  = 'Recall not allowed'
+            Why   = 'Group Policy "Allow Recall to be enabled" = Disabled (Policy CSP WindowsAI/AllowRecallEnablement). Microsoft: Recall is disabled, its bits removed and any snapshots deleted, after a restart. Copilot+ PCs, 24H2 build 26100.3915+, Pro / Education / Enterprise. debloat.psd1 removes the feature too, which also covers Home.'
+            Path  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+            ValueName = 'AllowRecallEnablement'
+            Value = 0
+            Type  = 'DWord'
+            Scope = 'Machine'
+            Tags  = @('personal')
+        }
+        @{
             Name  = 'Long path support'
             Why   = 'Lets tools handle paths over 260 characters. Saves pain with node_modules.'
             Path  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'

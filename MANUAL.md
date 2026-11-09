@@ -45,6 +45,8 @@ it as a read-through checklist.
 - [ ] Explorer shows file extensions
 - [ ] F1 does nothing in Explorer
 - [ ] Start menu search returns no web results
+- [ ] Win+W does nothing after a reboot (widgets fully off)
+- [ ] Copilot+ PC: after a reboot, Settings > Privacy & security has no "Recall & snapshots"
 - [ ] HWiNFO starts on login in sensors-only mode without a UAC prompt
 
 ## Not worth automating
