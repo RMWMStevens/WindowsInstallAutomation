@@ -225,10 +225,6 @@
            Why  = 'Lets tools handle paths over 260 characters. Saves pain with node_modules.'
            Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
            Value = 'LongPathsEnabled'; Data = 1 }
-        @{ Name = 'Verbose startup and shutdown messages'
-           Why  = 'Says what Windows is actually waiting on during a slow boot.'
-           Key  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
-           Value = 'VerboseStatus'; Data = 1 }
         @{ Name = 'Windows Update active hours start 07:00'
            Why  = 'Windows Update > Advanced options > Active hours, set by hand to 07:00-01:00: no restarts in that window.'
            Key  = 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings'

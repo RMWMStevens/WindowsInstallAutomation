@@ -19,5 +19,9 @@
            Why  = 'Folder Options > Privacy: "Show frequently used folders" off.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer'
            Value = 'ShowFrequent'; Data = 0; Explorer = $true }
+        @{ Name = 'Verbose startup and shutdown messages'
+           Why  = 'Says what Windows is actually waiting on during a slow boot. Whole PC, needs admin.'
+           Key  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+           Value = 'VerboseStatus'; Data = 1 }
     )
 }

@@ -100,7 +100,7 @@ Setup.ps1              the whole run, top to bottom -- read this to see what hap
 data\apps.psd1         the apps you can pick
 data\remove.psd1       what gets removed, every run (Xbox list only if you say so)
 data\tweaks.psd1       general tweaks, sensible on any PC: no nags, no web search, Edge out of memory
-data\personal.psd1     my own preferences: hidden files, no recent files, Start lists
+data\personal.psd1     my own preferences: hidden files, no recent files, Start lists, verbose boot messages
 data\privacy.psd1      what Windows and Office send to Microsoft, and the AI features
 data\start-pins.json   your Start pins (exported with Export-StartLayout), applied with personal.psd1
 data\office.xml        how Microsoft 365 is installed (Word, Excel, PowerPoint only)

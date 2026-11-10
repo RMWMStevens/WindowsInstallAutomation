@@ -183,8 +183,9 @@ function New-RestorePoint {
 # === 2. Installing ===========================================================
 
 # Shows every app as a numbered list, grouped, and returns the ones picked.
-# Answering n at "Go ahead?" shows the menu again. $Choice skips the menu; it
-# takes the same input: 'all', 'none', group names, numbers, ranges like 20-25.
+# Answering n at "Go ahead?", or typing nothing usable, shows the menu again.
+# $Choice skips the menu; it takes the same input: 'all', 'none', group names,
+# numbers, ranges like 20-25.
 function Select-Apps {
     param([Parameter(Mandatory)][object[]]$Apps, [string[]]$Choice)
 
@@ -226,6 +227,13 @@ function Select-Apps {
         }
         $result = @($picked | Sort-Object | ForEach-Object { $Apps[$_ - 1] })
 
+        # Typed something, but none of it was an app or a group (a stray key, a
+        # typo): ask again rather than quietly install nothing. Only just
+        # Enter, or 'none', means no apps.
+        if ($interactive -and -not $result -and "$Choice".Trim() -and $Choice -notmatch '\bnone\b') {
+            Write-Host '  Nothing in that matched an app number or a group -- try again.' -ForegroundColor Yellow
+            continue
+        }
         if (-not $interactive -or -not $result) { return $result }
         Write-Host ''
         Write-Host "  $($result.Count) app(s): $($result.Name -join ', ')"
@@ -326,11 +334,14 @@ function Get-WingetUpdates {
 #                     Microsoft's default setup, OneDrive and Teams included.
 #   Windows Terminal  Setup's own window runs inside it; updating it would close
 #                     that window halfway through. The Microsoft Store updates it.
+#   App Installer     this is winget itself. Updating it mid-run left winget
+#                     unable to answer straight after (seen on the laptop), and
+#                     Setup still needs it then. The Microsoft Store updates it.
 #   Node.js           only within its current major version (26.x stays 26.x):
 #                     a jump to a new major can break projects, so that one is
 #                     yours to make: winget pin remove OpenJS.NodeJS.LTS, then
 #                     winget upgrade OpenJS.NodeJS.LTS
-$script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20HK701')
+$script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20HK701', 'Microsoft.AppInstaller', '9NBLGGH4NNS1')
 
 function Update-AllApps {
     $name = 'Update all apps'
@@ -370,8 +381,9 @@ function Update-AllApps {
     $left = @(Get-WingetUpdates)
     if ($left) {
         $names = $left.Name -join ', '
-        Write-Log "$name -- not updated: $names. winget's reason is in the log; usually it means uninstalling the app and installing it again." -Level Fail
-        Add-Result -Step 'apps' -Name $name -Status Failed -Detail "not updated: $names -- see the log"
+        Write-Log ("$name -- not updated: $names. winget's reason is in the log. Often the app was open: " +
+            "close it and run Setup again. Otherwise the new version needs a fresh install: uninstall the app, then install it again.") -Level Fail
+        Add-Result -Step 'apps' -Name $name -Status Failed -Detail "not updated: $names -- app open, or needs a fresh install (see the log)"
     }
     elseif ($exit -notin 0, -1978335189, -1978335212) {
         Write-Log "$name -- winget exit $exit (see the log)" -Level Fail
