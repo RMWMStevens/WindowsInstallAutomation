@@ -20,6 +20,10 @@ $global:WhatIfPreference = $false
 Import-Module Appx, Dism -Global -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 $global:WhatIfPreference = $whatIf
 
+# winget writes UTF-8; without this Windows PowerShell reads it in the old
+# console code page and "HWiNFO(R)" turns into "HWiNFO┬«" on screen and in the log.
+try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+
 
 # === Logging and the summary =================================================
 
@@ -144,12 +148,13 @@ function Test-IsAdmin {
 
 # A restore point before anything changes. System Protection is switched on for
 # the Windows drive first: without it there is nothing to restore to.
+# Returns $true when there is one to fall back on.
 function New-RestorePoint {
     $name = 'Restore point'
     if ($WhatIfPreference) {
         Write-Log "$name -- would create one before changing anything"
         Add-Result -Step 'safety' -Name $name -Status Skipped -Detail 'WhatIf'
-        return
+        return $true
     }
     try {
         Write-Log "$name -- creating one, this takes a minute..."
@@ -161,14 +166,16 @@ function New-RestorePoint {
             # Windows allows one a day; the one it already made covers this run.
             Write-Log "$name -- Windows made one in the last 24 hours, that one covers this run" -Level Skip
             Add-Result -Step 'safety' -Name $name -Status AlreadySet
-            return
+            return $true
         }
         Write-Log "$name -- created ('Before WindowsInstallAutomation')" -Level Ok
         Add-Result -Step 'safety' -Name $name -Status Changed
+        $true
     }
     catch {
         Write-Log "$name -- $($_.Exception.Message)" -Level Fail
         Add-Result -Step 'safety' -Name $name -Status Failed -Detail $_.Exception.Message
+        $false
     }
 }
 
@@ -176,54 +183,54 @@ function New-RestorePoint {
 # === 2. Installing ===========================================================
 
 # Shows every app as a numbered list, grouped, and returns the ones picked.
-# $Choice skips the menu. It takes the same input as the menu: 'all', 'none',
-# group names, numbers, and ranges like 20-25.
+# Answering n at "Go ahead?" shows the menu again. $Choice skips the menu; it
+# takes the same input: 'all', 'none', group names, numbers, ranges like 20-25.
 function Select-Apps {
     param([Parameter(Mandatory)][object[]]$Apps, [string[]]$Choice)
 
     $interactive = -not $Choice
-    if ($interactive) {
-        $group = $null
-        for ($i = 0; $i -lt $Apps.Count; $i++) {
-            if ($Apps[$i].Group -ne $group) {
-                $group = $Apps[$i].Group
-                Write-Host ''
-                Write-Host "  $group" -ForegroundColor Cyan
+    while ($true) {
+        if ($interactive) {
+            $group = $null
+            for ($i = 0; $i -lt $Apps.Count; $i++) {
+                if ($Apps[$i].Group -ne $group) {
+                    $group = $Apps[$i].Group
+                    Write-Host ''
+                    Write-Host "  $group" -ForegroundColor Cyan
+                }
+                $asks = if ($Apps[$i].Ask) { '  (asks first)' } else { '' }
+                Write-Host ('    {0,2}  {1}{2}' -f ($i + 1), $Apps[$i].Name, $asks)
             }
-            $asks = if ($Apps[$i].Ask) { '  (asks first)' } else { '' }
-            Write-Host ('    {0,2}  {1}{2}' -f ($i + 1), $Apps[$i].Name, $asks)
+            Write-Host ''
+            Write-Host '  Type numbers, ranges or group names, e.g.  all   or   core social tools   or   1-5 9' -ForegroundColor Gray
+            Write-Host '  Just Enter installs nothing (the removals and settings still run).' -ForegroundColor Gray
+            $Choice = Read-Host '  Install'
         }
-        Write-Host ''
-        Write-Host '  Type numbers, ranges or group names, e.g.  all   or   core social tools   or   1-5 9' -ForegroundColor Gray
-        Write-Host '  Just Enter installs nothing (the removals and settings still run).' -ForegroundColor Gray
-        $Choice = Read-Host '  Install'
-    }
 
-    $picked = [System.Collections.Generic.List[int]]::new()
-    foreach ($token in ($Choice -split '[,\s]+' | Where-Object { $_ })) {
-        $numbers = switch -Regex ($token) {
-            '^all$'         { 1..$Apps.Count; break }
-            '^none$'        { break }
-            '^\d+$'         { [int]$token; break }
-            '^(\d+)-(\d+)$' { [int]$Matches[1]..[int]$Matches[2]; break }
-            default {
-                $inGroup = @(1..$Apps.Count | Where-Object { $Apps[$_ - 1].Group -eq $token })
-                if ($inGroup) { $inGroup } else { Write-Log "'$token' is not a number or a group -- ignored" -Level Warn }
+        $picked = [System.Collections.Generic.List[int]]::new()
+        foreach ($token in ($Choice -split '[,\s]+' | Where-Object { $_ })) {
+            $numbers = switch -Regex ($token) {
+                '^all$'         { 1..$Apps.Count; break }
+                '^none$'        { break }
+                '^\d+$'         { [int]$token; break }
+                '^(\d+)-(\d+)$' { [int]$Matches[1]..[int]$Matches[2]; break }
+                default {
+                    $inGroup = @(1..$Apps.Count | Where-Object { $Apps[$_ - 1].Group -eq $token })
+                    if ($inGroup) { $inGroup } else { Write-Log "'$token' is not a number or a group -- ignored" -Level Warn }
+                }
+            }
+            foreach ($n in $numbers) {
+                if ($n -lt 1 -or $n -gt $Apps.Count) { Write-Log "There is no app $n -- ignored" -Level Warn }
+                elseif (-not $picked.Contains($n)) { $picked.Add($n) }
             }
         }
-        foreach ($n in $numbers) {
-            if ($n -lt 1 -or $n -gt $Apps.Count) { Write-Log "There is no app $n -- ignored" -Level Warn }
-            elseif (-not $picked.Contains($n)) { $picked.Add($n) }
-        }
-    }
-    $result = @($picked | Sort-Object | ForEach-Object { $Apps[$_ - 1] })
+        $result = @($picked | Sort-Object | ForEach-Object { $Apps[$_ - 1] })
 
-    if ($interactive -and $result) {
+        if (-not $interactive -or -not $result) { return $result }
         Write-Host ''
         Write-Host "  $($result.Count) app(s): $($result.Name -join ', ')"
-        if ((Read-Host '  Go ahead? [Y/n]') -match '^[nN]') { return }
+        if ((Read-Host '  Go ahead? [Y/n] (n picks again)') -notmatch '^[nN]') { return $result }
     }
-    $result
 }
 
 # On a brand-new install winget only appears once the Store has updated App
@@ -274,10 +281,14 @@ function Install-WingetApp {
         --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | Out-String
     if ($script:LogPath) { $out | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false }
 
-    # These two codes mean "already installed / nothing newer"; both are fine.
-    if ($LASTEXITCODE -in 0, -1978335189, -1978335135) {
+    if ($LASTEXITCODE -eq 0) {
         Write-Log $Name -Level Ok
         Add-Result -Step 'apps' -Name $Name -Status Changed
+    }
+    elseif ($LASTEXITCODE -in -1978335189, -1978335135) {
+        # winget's own "already installed / nothing newer": nothing changed.
+        Write-Log "$Name -- already installed" -Level Skip
+        Add-Result -Step 'apps' -Name $Name -Status AlreadySet
     }
     else {
         Write-Log "$Name -- winget exit $LASTEXITCODE (see log)" -Level Fail
@@ -285,22 +296,52 @@ function Install-WingetApp {
     }
 }
 
-# Brings every app winget knows about up to date, except two it is told to
-# leave alone ("pinned"; undo with winget pin remove <id>). Both still update
-# themselves:
-#   Microsoft 365     winget's own Office package would rerun Microsoft's
-#                     default setup, OneDrive and Teams included.
-#   Windows Terminal  Setup's own window usually runs inside it. Updating it
-#                     would close that window halfway through the run.
-#                     The Microsoft Store updates it once nothing is open.
+# What winget would update right now: Name, Id and installed Version. Read
+# from winget's table by column position, so it works in any Windows language.
+# Apps winget is told to leave alone (pins, below) are not in the table.
+function Get-WingetUpdates {
+    $lines = @(& winget upgrade --accept-source-agreements --disable-interactivity 2>$null |
+        ForEach-Object { ("$_" -split "`r")[-1] })
+    $dashes = [array]::FindIndex([string[]]$lines, [Predicate[string]] { param($l) $l -match '^-{20,}$' })
+    if ($dashes -lt 1) { return }   # no table: nothing to update
+    $columns = [regex]::Matches($lines[$dashes - 1], '\S+')   # Name, Id, Version, Available, Source
+    if ($columns.Count -lt 5) { return }
+    $idAt, $versionAt, $sourceAt = $columns[1].Index, $columns[2].Index, $columns[4].Index
+    foreach ($row in $lines[($dashes + 1)..($lines.Count - 1)]) {
+        # A real row ends in one word (the source) at the Source column; the
+        # sentences winget prints under the table do not.
+        if ($row.Length -le $sourceAt -or $row.Substring($sourceAt).Trim() -match '\s') { break }
+        [pscustomobject]@{
+            Name    = $row.Substring(0, $idAt).Trim()
+            Id      = $row.Substring($idAt).Trim().Split(' ')[0]
+            Version = $row.Substring($versionAt).Trim().Split(' ')[0]
+        }
+    }
+}
+
+# Brings every app winget knows about up to date, except what it is told to
+# leave alone ("pinned"; see them with: winget pin list). All of these still
+# get updated, just not by Setup:
+#   Microsoft 365     updates itself. winget's own Office package would rerun
+#                     Microsoft's default setup, OneDrive and Teams included.
+#   Windows Terminal  Setup's own window runs inside it; updating it would close
+#                     that window halfway through. The Microsoft Store updates it.
+#   Node.js           only within its current major version (26.x stays 26.x):
+#                     a jump to a new major can break projects, so that one is
+#                     yours to make: winget pin remove OpenJS.NodeJS.LTS, then
+#                     winget upgrade OpenJS.NodeJS.LTS
 $script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20HK701')
 
 function Update-AllApps {
     $name = 'Update all apps'
+    $before = @(Get-WingetUpdates | Where-Object { $_.Id -notin $script:LeaveAlone })
+    if (-not $before) {
+        Write-Log "$name -- everything is up to date already" -Level Skip
+        Add-Result -Step 'apps' -Name $name -Status AlreadySet
+        return
+    }
     if ($WhatIfPreference) {
-        $list = & winget upgrade --accept-source-agreements --disable-interactivity 2>$null
-        $count = if (($list -join "`n") -match '(\d+) upgrades? available') { $Matches[1] } else { 'all outdated' }
-        Write-Log "$name -- would update $count app(s) with winget upgrade --all"
+        Write-Log "$name -- would update $($before.Count) app(s): $($before.Name -join ', ')"
         Add-Result -Step 'apps' -Name $name -Status Skipped -Detail 'WhatIf'
         return
     }
@@ -308,19 +349,37 @@ function Update-AllApps {
     foreach ($id in $script:LeaveAlone) {
         $null = & winget pin add --id $id --exact --accept-source-agreements --disable-interactivity 2>&1
     }
-    Write-Log "$name -- running winget upgrade --all (not Microsoft 365 or Windows Terminal), this can take a while..."
-    $out = & winget upgrade --all --silent --accept-package-agreements --accept-source-agreements `
-        --disable-interactivity 2>&1 | Out-String
-    if ($script:LogPath) { $out | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false }
+    $node = $before | Where-Object { $_.Id -eq 'OpenJS.NodeJS.LTS' }
+    if ($node -and $node.Version -match '^v?(\d+)\.') {
+        $null = & winget pin add --id OpenJS.NodeJS.LTS --exact --version "$($Matches[1]).*" --force `
+            --accept-source-agreements --disable-interactivity 2>&1
+    }
 
-    # 0 = done; the other two mean "nothing to update".
-    if ($LASTEXITCODE -in 0, -1978335189, -1978335212) {
-        Write-Log "$name -- done" -Level Ok
-        Add-Result -Step 'apps' -Name $name -Status Changed
+    # One line per app on screen while it runs, everything winget says in the log.
+    Write-Log "$name -- updating, this can take a while..."
+    & winget upgrade --all --silent --accept-package-agreements --accept-source-agreements `
+        --disable-interactivity 2>&1 | ForEach-Object {
+        $line = ("$_" -split "`r")[-1]
+        if ($script:LogPath) { Add-Content $script:LogPath $line -Encoding UTF8 -WhatIf:$false }
+        if ($line -match '^\((\d+)/(\d+)\)\s+\S+\s+(.+?)\s+\[') { Write-Host "    ($($Matches[1])/$($Matches[2])) $($Matches[3])" -ForegroundColor Gray }
+    }
+    $exit = $LASTEXITCODE
+
+    # Whatever winget still offers afterwards did not get updated -- an app that
+    # was open, or one whose new version needs a fresh install.
+    $left = @(Get-WingetUpdates)
+    if ($left) {
+        $names = $left.Name -join ', '
+        Write-Log "$name -- not updated: $names. winget's reason is in the log; usually it means uninstalling the app and installing it again." -Level Fail
+        Add-Result -Step 'apps' -Name $name -Status Failed -Detail "not updated: $names -- see the log"
+    }
+    elseif ($exit -notin 0, -1978335189, -1978335212) {
+        Write-Log "$name -- winget exit $exit (see the log)" -Level Fail
+        Add-Result -Step 'apps' -Name $name -Status Failed -Detail "winget exit $exit -- see the log"
     }
     else {
-        Write-Log "$name -- some updates failed (winget exit $LASTEXITCODE, see the log)" -Level Fail
-        Add-Result -Step 'apps' -Name $name -Status Failed -Detail "winget exit $LASTEXITCODE -- see the log"
+        Write-Log "$name -- done" -Level Ok
+        Add-Result -Step 'apps' -Name $name -Status Changed
     }
 }
 
@@ -453,6 +512,16 @@ function Get-ProvisionedApp {
     $script:Provisioned
 }
 
+# Which accounts really have a Store app installed. With admin rights Windows
+# also lists apps that are only "staged" (its copy, waiting for new users);
+# those do not count here.
+function Get-InstalledStoreApp {
+    param([Parameter(Mandatory)][string]$Package)
+    $admin = Test-IsAdmin
+    @(Get-AppxPackage -AllUsers:$admin -Name $Package -ErrorAction SilentlyContinue |
+        Where-Object { -not $admin -or ($_.PackageUserInformation | Where-Object { "$($_.InstallState)" -eq 'Installed' }) })
+}
+
 # Store apps: removed for every user on the PC, and deprovisioned.
 # Anything removed here can be reinstalled from the Store.
 function Remove-StoreApp {
@@ -469,12 +538,7 @@ function Remove-StoreApp {
         return
     }
 
-    $admin = Test-IsAdmin
-    # With admin rights this also lists apps that are only "staged" (Windows'
-    # copy, waiting for new users). Count an app as installed only where an
-    # account really has it.
-    $installed = @(Get-AppxPackage -AllUsers:$admin -Name $Package -ErrorAction SilentlyContinue |
-        Where-Object { -not $admin -or ($_.PackageUserInformation | Where-Object { "$($_.InstallState)" -eq 'Installed' }) })
+    $installed = Get-InstalledStoreApp $Package
     if ($installed | Where-Object { $_.NonRemovable }) {
         Write-Log "$Name -- refused, Windows marks '$Package' as part of the system" -Level Warn
         Add-Result -Step 'remove' -Name $Name -Status Skipped -Detail 'part of Windows'
@@ -693,7 +757,8 @@ function Set-BlackBackground {
     $name = 'Black background'
     $file = Join-Path $script:WorkDir 'black.png'
 
-    if ((Test-Path $file) -and (Get-ItemProperty 'HKCU:\Control Panel\Desktop' -ErrorAction SilentlyContinue).WallPaper -eq $file) {
+    $desktop = Get-ItemProperty 'HKCU:\Control Panel\Desktop' -ErrorAction SilentlyContinue
+    if ((Test-Path $file) -and $desktop.WallPaper -eq $file -and $desktop.WallpaperStyle -eq '10') {
         Write-Log "$name -- already set" -Level Skip
         Add-Result -Step 'extras' -Name $name -Status AlreadySet
         return
@@ -715,9 +780,19 @@ function Set-BlackBackground {
         $bmp.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
         $bmp.Dispose()
 
-        # Desktop: the call Settings itself makes. Shows straight away.
-        Add-Type -Namespace WIA -Name Wallpaper -MemberDefinition `
-            '[DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern bool SystemParametersInfo(int action, int param, string value, int flags);'
+        # Desktop: the call Settings itself makes. Shows straight away. Fit is
+        # set to "Fill" first and the desktop colour to black, so no screen
+        # shape or size can leave a coloured edge around the picture.
+        Set-ItemProperty 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'
+        Set-ItemProperty 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'
+        Set-ItemProperty 'HKCU:\Control Panel\Colors' -Name Background -Value '0 0 0'
+        Add-Type -Namespace WIA -Name Wallpaper -MemberDefinition @'
+[DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+public static extern bool SystemParametersInfo(int action, int param, string value, int flags);
+[DllImport("user32.dll", SetLastError = true)]
+public static extern bool SetSysColors(int count, int[] elements, int[] colors);
+'@
+        $null = [WIA.Wallpaper]::SetSysColors(1, @(1), @(0))   # desktop colour (1) = black, right away
         if (-not [WIA.Wallpaper]::SystemParametersInfo(0x14, 0, $file, 3)) { throw 'Windows refused the desktop background' }
 
         # Lock screen: Windows' own lock screen API, the one apps use.

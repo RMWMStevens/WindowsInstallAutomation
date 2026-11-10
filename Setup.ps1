@@ -35,6 +35,12 @@ param([string[]]$Apps)
 
 . (Join-Path $PSScriptRoot 'tools\Helpers.ps1')
 
+# Without Windows Terminal, Setup opens in the classic PowerShell window, which
+# is bright blue. Plain black is calmer. (Inside Terminal this is skipped.)
+if (-not $env:WT_SESSION -and $Host.Name -eq 'ConsoleHost') {
+    try { $Host.UI.RawUI.BackgroundColor = 'Black'; $Host.UI.RawUI.ForegroundColor = 'Gray'; Clear-Host } catch { }
+}
+
 # A dry run may go without admin; a real one needs it for the whole-PC parts.
 if (-not (Test-IsAdmin) -and -not $WhatIfPreference) {
     Write-Host 'Setup needs admin rights. Start it with Setup.cmd, which asks for them.' -ForegroundColor Red
@@ -84,7 +90,14 @@ Write-Log ("Answers: new name=$(if ($newName) { $newName } else { 'keep' }), twe
 
 # === 0. Restore point ========================================================
 Write-Log 'Restore point' -Level Step
-New-RestorePoint
+if (-not (New-RestorePoint)) {
+    if (-not (Read-YesNo 'No restore point could be made. Continue without one?')) {
+        Write-Log 'Stopped before changing anything.' -Level Warn
+        Show-Summary
+        exit 1
+    }
+    Write-Log 'Continuing without a restore point, as you asked.' -Level Warn
+}
 
 
 # === 1. Remove apps ==========================================================
@@ -132,6 +145,17 @@ foreach ($app in $chosen) {
 if (-not $chosen) { Write-Log 'Nothing picked.' }
 if ($updateAll -and $haveWinget) { Update-AllApps }
 
+# Installers can bring removed apps back -- Microsoft 365 adds its companion
+# apps. When something was actually installed, look once more, and only act on
+# Store apps from the removal list that really are back. (Guarded ones, like
+# OneDrive's, were already handled in step 1 and stay with that decision.)
+$installedSomething = $script:Results | Where-Object { $_.Step -eq 'apps' -and $_.Status -eq 'Changed' -and $_.Name -ne 'Update all apps' }
+if ($installedSomething) {
+    foreach ($r in $removeData.Remove | Where-Object { $_.Package -and -not $_.Guard }) {
+        if (Get-InstalledStoreApp $r.Package) { Remove-StoreApp -Package $r.Package -Name "$($r.Name) (came back with an install)" }
+    }
+}
+
 
 # === 3-5. Tweaks, personal preferences, privacy ==============================
 $restartExplorer = $false
@@ -175,7 +199,15 @@ if ($restartExplorer) {
         Write-Log 'Explorer restarted.' -Level Ok
     }
 }
-if ($newName -and -not $WhatIfPreference) { Write-Host ''; Write-Host " Restart the PC to finish renaming it to $newName." -ForegroundColor Yellow }
+# Policies, Start pins, a new name and removed parts of Windows only fully take
+# effect after a restart. Installs alone do not need one.
+$needsRestart = $script:Results | Where-Object { $_.Status -eq 'Changed' -and $_.Step -in 'remove', 'tweaks', 'personal', 'privacy', 'extras' }
+if ($needsRestart -and -not $WhatIfPreference) {
+    Write-Host ''
+    Write-Host ' Restart the PC when you are done: policies, Start pins and removed parts' -ForegroundColor Yellow
+    Write-Host ' of Windows only fully take effect after a restart.' -ForegroundColor Yellow
+    if ($newName) { Write-Host " The restart also finishes renaming this PC to $newName." -ForegroundColor Yellow }
+}
 
 Write-Host ''
 Write-Host ' Next: read MANUAL.md for what is left to do by hand.' -ForegroundColor Yellow

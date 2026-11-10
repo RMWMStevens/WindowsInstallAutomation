@@ -35,7 +35,8 @@ Windows update, say.
 
    After that it runs on its own: a restore point first, then it removes the
    bloat, installs your apps, updates what is left, and applies what you said
-   yes to.
+   yes to. If no restore point can be made, it stops and asks before changing
+   anything. When it is done, it tells you if a restart is needed.
 5. Read `MANUAL.md` and work through what is left to do by hand.
 
 No internet in PowerShell, or want a local copy? Download the repo (**Code >
@@ -73,6 +74,7 @@ Type numbers, ranges or group names, separated by spaces or commas:
 
 Groups: Core, Social, Tools, Media, Personal, Dev, Gaming, MediaTools.
 
+Setup then lists what you picked and asks "Go ahead?" -- answer `n` to pick again.
 To skip the menu: `Setup.cmd -Apps core,social` (or `-Apps all`, `-Apps none`).
 
 **Microsoft 365** is a big download and needs a licence, so picking it asks one
@@ -102,6 +104,7 @@ data\personal.psd1     my own preferences: hidden files, no recent files, Start 
 data\privacy.psd1      what Windows and Office send to Microsoft, and the AI features
 data\start-pins.json   your Start pins (exported with Export-StartLayout), applied with personal.psd1
 data\office.xml        how Microsoft 365 is installed (Word, Excel, PowerPoint only)
+tools\Start-Setup.ps1  opens Setup as admin in Windows Terminal (or a classic window)
 tools\Helpers.ps1      the functions Setup.ps1 calls
 tools\Test-AppIds.ps1  checks every app ID still exists in winget
 MANUAL.md              what is left to do by hand after Setup
