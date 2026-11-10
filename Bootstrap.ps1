@@ -1,11 +1,11 @@
 # Runs Setup straight from GitHub -- no cloning or downloading first.
 # Paste this into any PowerShell window:
 #
-#   irm https://raw.githubusercontent.com/RMWMStevens/WindowsInstallAutomation/main/Bootstrap.ps1 | iex
+#   irm https://roelie.cc/wia | iex
 #
 # With Setup arguments (a dry run, or skipping the app menu):
 #
-#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/RMWMStevens/WindowsInstallAutomation/main/Bootstrap.ps1))) -WhatIf
+#   & ([scriptblock]::Create((irm https://roelie.cc/wia))) -WhatIf
 #
 # It downloads the repo as a zip into a fresh temp folder, then starts Setup.ps1
 # in Windows PowerShell, as admin, in a new window that stays open.

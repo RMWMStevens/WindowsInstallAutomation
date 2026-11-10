@@ -15,7 +15,7 @@ Windows update, say.
 3. Open PowerShell (Start > type `powershell`) and paste:
 
    ```powershell
-   irm https://raw.githubusercontent.com/RMWMStevens/WindowsInstallAutomation/main/Bootstrap.ps1 | iex
+   irm https://roelie.cc/wia | iex
    ```
 
    It downloads the latest version from GitHub into a temp folder and starts
@@ -29,7 +29,7 @@ Download ZIP**), extract it and double-click **`Setup.cmd`** instead.
 Arguments work with the one-liner too, in this form:
 
 ```powershell
-& ([scriptblock]::Create((irm https://raw.githubusercontent.com/RMWMStevens/WindowsInstallAutomation/main/Bootstrap.ps1))) -WhatIf
+& ([scriptblock]::Create((irm https://roelie.cc/wia))) -WhatIf
 ```
 
 ## Picking apps
