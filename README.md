@@ -33,8 +33,9 @@ Windows update, say.
    | Apply my personal preferences and Start pins? Say no on someone else's PC. Pins show after signing out and in. | no      |
    | Plain black background on the desktop and the lock / sign-in screen?                                           | no      |
 
-   After that it runs on its own: a restore point first, then installs, removes
-   the bloat, and applies what you said yes to.
+   After that it runs on its own: a restore point first, then it removes the
+   bloat, installs your apps, updates what is left, and applies what you said
+   yes to.
 5. Read `MANUAL.md` and work through what is left to do by hand.
 
 No internet in PowerShell, or want a local copy? Download the repo (**Code >

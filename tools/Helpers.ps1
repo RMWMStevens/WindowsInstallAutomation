@@ -173,7 +173,7 @@ function New-RestorePoint {
 }
 
 
-# === 1. Installing ===========================================================
+# === 2. Installing ===========================================================
 
 # Shows every app as a numbered list, grouped, and returns the ones picked.
 # $Choice skips the menu. It takes the same input as the menu: 'all', 'none',
@@ -388,7 +388,7 @@ function Install-FromUrl {
 }
 
 
-# === 2. Removing =============================================================
+# === 1. Removing =============================================================
 
 # Desktop, Documents etc. that OneDrive folder backup has moved into OneDrive.
 # Uninstalling OneDrive while any are listed would leave Explorer pointing at

@@ -6,8 +6,10 @@
     First you pick apps and answer a few yes/no questions; after that it runs
     on its own, top to bottom:
       0. Restore point      always, before anything changes
-      1. Install apps       the ones you picked, then optionally update all apps
-      2. Remove apps        everything in data\remove.psd1 (+ Xbox if you said so)
+      1. Remove apps        everything in data\remove.psd1 (+ Xbox if you said so)
+      2. Install apps       the ones you picked, then optionally update what is
+                            left -- after the removals, so nothing is updated
+                            only to be removed
       3. Tweaks             data\tweaks.psd1   -- sensible on any PC
       4. Personal           data\personal.psd1 + Start pins -- my own preferences
       5. Privacy            data\privacy.psd1
@@ -85,29 +87,7 @@ Write-Log 'Restore point' -Level Step
 New-RestorePoint
 
 
-# === 1. Install apps =========================================================
-Write-Log 'Install apps' -Level Step
-
-$haveWinget = $false
-if (($chosen | Where-Object { $_.Id }) -or $updateAll) { $haveWinget = Initialize-Winget }
-
-foreach ($app in $chosen) {
-    if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
-
-    if ($app.Url) {
-        Install-FromUrl -Name $app.Name -Url $app.Url -Signer $app.Signer -Detect $app.Detect `
-            -Arguments ("$($app.Args)".Replace('{data}', $data))
-    }
-    elseif ($haveWinget) {
-        $source = if ($app.Source) { $app.Source } else { 'winget' }
-        Install-WingetApp -Id $app.Id -Name $app.Name -Source $source
-    }
-}
-if (-not $chosen) { Write-Log 'Nothing picked.' }
-if ($updateAll -and $haveWinget) { Update-AllApps }
-
-
-# === 2. Remove apps ==========================================================
+# === 1. Remove apps ==========================================================
 Write-Log 'Remove apps' -Level Step
 
 foreach ($r in $removeData.Remove) {
@@ -129,6 +109,28 @@ if ($removeXbox) {
     foreach ($x in $removeData.Xbox) { Remove-StoreApp -Package $x.Package -Name $x.Name -Xbox }
 }
 else { Write-Log 'Xbox apps -- kept' -Level Skip }
+
+
+# === 2. Install apps, then update what is left ================================
+Write-Log 'Install apps' -Level Step
+
+$haveWinget = $false
+if (($chosen | Where-Object { $_.Id }) -or $updateAll) { $haveWinget = Initialize-Winget }
+
+foreach ($app in $chosen) {
+    if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
+
+    if ($app.Url) {
+        Install-FromUrl -Name $app.Name -Url $app.Url -Signer $app.Signer -Detect $app.Detect `
+            -Arguments ("$($app.Args)".Replace('{data}', $data))
+    }
+    elseif ($haveWinget) {
+        $source = if ($app.Source) { $app.Source } else { 'winget' }
+        Install-WingetApp -Id $app.Id -Name $app.Name -Source $source
+    }
+}
+if (-not $chosen) { Write-Log 'Nothing picked.' }
+if ($updateAll -and $haveWinget) { Update-AllApps }
 
 
 # === 3-5. Tweaks, personal preferences, privacy ==============================
