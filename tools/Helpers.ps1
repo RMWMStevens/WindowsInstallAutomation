@@ -237,36 +237,35 @@ function Initialize-Winget {
     $false
 }
 
-# Asks before installing an app marked Ask = $true in apps.psd1.
-function Confirm-Install {
-    param([Parameter(Mandatory)][string]$Name)
-    if ((Read-Host "  Install $Name now? [y/N]") -match '^[yY]') { return $true }
-    Write-Log "$Name -- not installed, you said no" -Level Skip
-    Add-Result -Step 'apps' -Name $Name -Status Skipped -Detail 'declined'
-    $false
+# Is an app from apps.psd1 already on this PC? The same check the installers
+# make. A winget app counts as not installed while winget is not there yet.
+function Test-AppInstalled {
+    param([Parameter(Mandatory)][hashtable]$App)
+    if ($App.Url) { return [bool](Get-InstalledProgram $App.Detect) }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return $false }
+    $source = if ($App.Source) { $App.Source } else { 'winget' }
+    $listed = & winget list --id $App.Id --exact --source $source --accept-source-agreements 2>$null
+    $LASTEXITCODE -eq 0 -and ($listed -join "`n") -match [regex]::Escape($App.Id)
 }
 
 function Install-WingetApp {
     param(
         [Parameter(Mandatory)][string]$Id,
         [Parameter(Mandatory)][string]$Name,
-        [string]$Source = 'winget',
-        [switch]$Ask
+        [string]$Source = 'winget'
     )
 
-    $listed = & winget list --id $Id --exact --source $Source --accept-source-agreements 2>$null
-    if ($LASTEXITCODE -eq 0 -and ($listed -join "`n") -match [regex]::Escape($Id)) {
+    if (Test-AppInstalled @{ Id = $Id; Source = $Source }) {
         Write-Log "$Name -- already installed" -Level Skip
         Add-Result -Step 'apps' -Name $Name -Status AlreadySet
         return
     }
 
     if ($WhatIfPreference) {
-        Write-Log "$Name -- would install$(if ($Ask) { ' (asks first)' })"
+        Write-Log "$Name -- would install"
         Add-Result -Step 'apps' -Name $Name -Status Skipped -Detail 'WhatIf'
         return
     }
-    if ($Ask -and -not (Confirm-Install $Name)) { return }
 
     Write-Log "$Name -- installing..."
     $out = & winget install --id $Id --exact --silent --source $Source `
@@ -284,9 +283,16 @@ function Install-WingetApp {
     }
 }
 
-# Brings every app winget knows about up to date. Microsoft 365 is pinned
-# first so winget leaves it alone: it updates itself, and winget's own Office
-# package would rerun Microsoft's default setup (OneDrive and Teams included).
+# Brings every app winget knows about up to date, except two it is told to
+# leave alone ("pinned"; undo with winget pin remove <id>). Both still update
+# themselves:
+#   Microsoft 365     winget's own Office package would rerun Microsoft's
+#                     default setup, OneDrive and Teams included.
+#   Windows Terminal  Setup's own window usually runs inside it. Updating it
+#                     would close that window halfway through the run.
+#                     The Microsoft Store updates it once nothing is open.
+$script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20HK701')
+
 function Update-AllApps {
     $name = 'Update all apps'
     if ($WhatIfPreference) {
@@ -297,8 +303,10 @@ function Update-AllApps {
         return
     }
 
-    $null = & winget pin add --id Microsoft.Office --exact --accept-source-agreements --disable-interactivity 2>&1
-    Write-Log "$name -- running winget upgrade --all, this can take a while..."
+    foreach ($id in $script:LeaveAlone) {
+        $null = & winget pin add --id $id --exact --accept-source-agreements --disable-interactivity 2>&1
+    }
+    Write-Log "$name -- running winget upgrade --all (not Microsoft 365 or Windows Terminal), this can take a while..."
     $out = & winget upgrade --all --silent --accept-package-agreements --accept-source-agreements `
         --disable-interactivity 2>&1 | Out-String
     if ($script:LogPath) { $out | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false }
@@ -332,8 +340,7 @@ function Install-FromUrl {
         [Parameter(Mandatory)][string]$Url,
         [Parameter(Mandatory)][string]$Signer,
         [Parameter(Mandatory)][string]$Detect,
-        [string]$Arguments = '',
-        [switch]$Ask
+        [string]$Arguments = ''
     )
 
     if (Get-InstalledProgram $Detect) {
@@ -343,11 +350,10 @@ function Install-FromUrl {
     }
 
     if ($WhatIfPreference) {
-        Write-Log "$Name -- would download and install$(if ($Ask) { ' (asks first)' })"
+        Write-Log "$Name -- would download and install"
         Add-Result -Step 'apps' -Name $Name -Status Skipped -Detail 'WhatIf'
         return
     }
-    if ($Ask -and -not (Confirm-Install $Name)) { return }
 
     $file = Join-Path $env:TEMP ([IO.Path]::GetFileName(([uri]$Url).AbsolutePath))
     try {

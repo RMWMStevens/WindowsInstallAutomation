@@ -58,6 +58,15 @@ if ([Environment]::OSVersion.Version.Build -lt 22000) {
 # === Questions first, so the rest runs unattended ============================
 $chosen = @(Select-Apps -Apps $appList -Choice $Apps)
 
+# Big or licensed apps (Ask = $true, i.e. Microsoft 365) get one more question,
+# right here with the app choice -- but only when they are not installed yet.
+# They install last, after the quick ones.
+$chosen = @($chosen | Where-Object {
+        -not $_.Ask -or (Test-AppInstalled $_) -or
+        (Read-YesNo "$($_.Name) is a big download and needs a licence to use. Install it?")
+    })
+$chosen = @($chosen | Where-Object { -not $_.Ask }) + @($chosen | Where-Object { $_.Ask })
+
 Write-Host ''
 Write-Host '  A few questions. Each one defaults to the capital letter:' -ForegroundColor Cyan
 $newName     = if (Test-DefaultComputerName) { Read-NewComputerName }
@@ -86,12 +95,12 @@ foreach ($app in $chosen) {
     if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
 
     if ($app.Url) {
-        Install-FromUrl -Name $app.Name -Url $app.Url -Signer $app.Signer -Detect $app.Detect -Ask:([bool]$app.Ask) `
+        Install-FromUrl -Name $app.Name -Url $app.Url -Signer $app.Signer -Detect $app.Detect `
             -Arguments ("$($app.Args)".Replace('{data}', $data))
     }
     elseif ($haveWinget) {
         $source = if ($app.Source) { $app.Source } else { 'winget' }
-        Install-WingetApp -Id $app.Id -Name $app.Name -Source $source -Ask:([bool]$app.Ask)
+        Install-WingetApp -Id $app.Id -Name $app.Name -Source $source
     }
 }
 if (-not $chosen) { Write-Log 'Nothing picked.' }

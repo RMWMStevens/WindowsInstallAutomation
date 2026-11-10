@@ -23,15 +23,15 @@ Windows update, say.
 4. Pick your apps (below) and answer the questions. Each one defaults to the
    capital letter, so just pressing Enter gives the answer below:
 
-   | Question                                                                                   | Default |
-   | ------------------------------------------------------------------------------------------ | ------- |
-   | New name for this PC? Only asked while it still has a made-up name like `DESKTOP-1A2B3C4`. | keep    |
-   | Apply the general tweaks (`data\tweaks.psd1`)? Sensible on any PC.                         | yes     |
-   | Apply the privacy settings (`data\privacy.psd1`)?                                          | yes     |
-   | Update all installed apps afterwards (`winget upgrade --all`)?                             | yes     |
-   | Remove the Xbox apps too? Say no on a gaming PC -- games that sign in with Xbox need them. | no      |
-   | Apply my personal preferences and Start pins? Say no on someone else's PC. Pins show after signing out and in. | no |
-   | Plain black background on the desktop and the lock / sign-in screen?                       | no      |
+   | Question                                                                                                       | Default |
+   | -------------------------------------------------------------------------------------------------------------- | ------- |
+   | New name for this PC? Only asked while it still has a made-up name like `DESKTOP-1A2B3C4`.                     | keep    |
+   | Apply the general tweaks (`data\tweaks.psd1`)? Sensible on any PC.                                             | yes     |
+   | Apply the privacy settings (`data\privacy.psd1`)?                                                              | yes     |
+   | Update all installed apps afterwards (`winget upgrade --all`)?                                                 | yes     |
+   | Remove the Xbox apps too? Say no on a gaming PC -- games that sign in with Xbox need them.                     | no      |
+   | Apply my personal preferences and Start pins? Say no on someone else's PC. Pins show after signing out and in. | no      |
+   | Plain black background on the desktop and the lock / sign-in screen?                                           | no      |
 
    After that it runs on its own: a restore point first, then installs, removes
    the bloat, and applies what you said yes to.
@@ -73,6 +73,12 @@ Type numbers, ranges or group names, separated by spaces or commas:
 Groups: Core, Social, Tools, Media, Personal, Dev, Gaming, MediaTools.
 
 To skip the menu: `Setup.cmd -Apps core,social` (or `-Apps all`, `-Apps none`).
+
+**Microsoft 365** is a big download and needs a licence, so picking it asks one
+more question straight after the menu -- unless it is already installed, then
+it is simply skipped. It installs last, after the quicker apps. Setup only
+installs it; activating it is up to you (sign in with the account that holds
+the licence).
 
 ## Dry run
 

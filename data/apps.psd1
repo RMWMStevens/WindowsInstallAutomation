@@ -6,7 +6,8 @@
     #   Source  'msstore' for Store apps. Also use the Store build when that is
     #           the one you already have: winget sees the Store build and the
     #           winget build as two different apps and would install both.
-    #   Ask     $true = ask once more before installing (big or licensed apps)
+    #   Ask     $true = big or licensed: one extra question right after the menu
+    #           (skipped when already installed), and installed after the rest
     #   Note    printed when the app is installed
     #
     # Check every ID still exists with:  .\tools\Test-AppIds.ps1
