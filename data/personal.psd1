@@ -23,5 +23,9 @@
            Why  = 'Says what Windows is actually waiting on during a slow boot. Whole PC, needs admin.'
            Key  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
            Value = 'VerboseStatus'; Data = 1 }
+        @{ Name = 'Blue screen shows the details'
+           Why  = '(unchecked) After a crash, the blue screen also shows the error details, which usually point at the driver that caused it. Whole PC, needs admin.'
+           Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl'
+           Value = 'DisplayParameters'; Data = 1 }
     )
 }

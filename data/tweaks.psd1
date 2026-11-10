@@ -142,6 +142,10 @@
            Why  = '(unchecked) Privacy > General > "Show me notifications in the Settings app" off.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications'
            Value = 'EnableAccountNotifications'; Data = 0 }
+        @{ Name = 'Settings opens without its Home page'
+           Why  = '(policy) "Settings Page Visibility" = hide:home (Policy CSP Settings/PageVisibilityList). The Home page mostly shows recommendations and Microsoft 365 offers; Settings opens on System instead.'
+           Key  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer'
+           Value = 'SettingsPageVisibility'; Data = 'hide:home'; Type = 'String' }
         @{ Name = 'No fun facts and tips on the lock screen (1/2)'
            Why  = '(unchecked) Lock screen > "Get fun facts, tips, tricks, and more on your lock screen" off.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
