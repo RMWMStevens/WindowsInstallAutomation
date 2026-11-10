@@ -42,7 +42,9 @@ applies a set of settings. What it does, and how to run it:
 
     https://github.com/RMWMStevens/WindowsInstallAutomation
 
-What is in here:
+Made by Roel Stevens -- https://roelstevens.dev
+
+What is in this folder:
 
     logs\        one log file per run: what was changed, skipped or failed
     black.png    the black background picture, if you chose that option
