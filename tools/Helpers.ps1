@@ -7,6 +7,11 @@
 $script:Results = [System.Collections.Generic.List[object]]::new()
 $script:LogPath = $null
 
+# Setup's own folder on the PC, like AdwCleaner's C:\AdwCleaner: logs, and the
+# black background picture. Fixed and easy to find, whether Setup ran from a
+# clone or from the one-liner's temp folder. Safe to delete at any time.
+$script:WorkDir = Join-Path $env:SystemDrive 'WindowsInstallAutomation'
+
 # Load the Store-app and Windows-feature modules now, with -WhatIf switched off
 # just for this: loading them under -WhatIf prints a screen of "What if: Set
 # Alias" lines from their own setup code. Modules read the global setting.
@@ -20,8 +25,32 @@ $global:WhatIfPreference = $whatIf
 
 function Start-Log {
     param([Parameter(Mandatory)][string]$Path)
+    # Should the folder ever be out of reach, the log goes to the temp folder.
+    try { New-Item -ItemType Directory -Path (Split-Path $Path) -Force -WhatIf:$false -ErrorAction Stop | Out-Null }
+    catch { $Path = Join-Path $env:TEMP (Split-Path $Path -Leaf) }
     $script:LogPath = $Path
-    New-Item -ItemType Directory -Path (Split-Path $Path) -Force -WhatIf:$false | Out-Null
+
+    # Anyone who finds the folder later can read what it is.
+    if (Test-Path $script:WorkDir) {
+        Set-Content (Join-Path $script:WorkDir 'README.txt') -Encoding UTF8 -WhatIf:$false -ErrorAction SilentlyContinue -Value @'
+WindowsInstallAutomation
+========================
+
+This folder was made by WindowsInstallAutomation, a script that sets up a
+Windows 11 PC: it installs the apps you pick, removes pre-installed apps and
+applies a set of settings. What it does, and how to run it:
+
+    https://github.com/RMWMStevens/WindowsInstallAutomation
+
+What is in here:
+
+    logs\        one log file per run: what was changed, skipped or failed
+    black.png    the black background picture, if you chose that option
+
+Nothing on this PC depends on this folder. You can delete it at any time.
+'@
+    }
+
     $os = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
     "=== $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  Windows $($os.DisplayVersion) build $($os.CurrentBuild) $($os.EditionID) ===" |
         Set-Content $Path -Encoding UTF8 -WhatIf:$false
@@ -76,9 +105,69 @@ function Show-Summary {
     Write-Host " $changed change(s) applied. Log: $script:LogPath"
 }
 
+# A yes/no question; Enter gives the default. With no console to ask on (a
+# scripted run), the default is used as well.
+function Read-YesNo {
+    param([Parameter(Mandatory)][string]$Question, [bool]$Default = $false)
+    $hint = if ($Default) { '[Y/n]' } else { '[y/N]' }
+    try { $answer = Read-Host "  $Question $hint" } catch { return $Default }
+    if ($answer -match '^[yY]') { return $true }
+    if ($answer -match '^[nN]') { return $false }
+    $Default
+}
+
+# Windows' own made-up names: DESKTOP-1A2B3C4, LAPTOP-1A2B3C4D, WIN-...
+function Test-DefaultComputerName { $env:COMPUTERNAME -match '^(DESKTOP|LAPTOP|WIN)-[A-Z0-9]{5,11}$' }
+
+# Asks for a new PC name. Returns nothing when you keep the current one.
+function Read-NewComputerName {
+    try { $new = "$(Read-Host "  This PC is called $env:COMPUTERNAME. New name (Enter keeps it)")".Trim() } catch { return }
+    if (-not $new) { return }
+    # Windows' rules: up to 15 letters, digits or hyphens, not only digits,
+    # not starting or ending with a hyphen.
+    if ($new -notmatch '^[A-Za-z0-9-]{1,15}$' -or $new -match '^\d+$' -or $new -match '^-|-$') {
+        Write-Log "'$new' is not a valid PC name (up to 15 letters, digits or hyphens) -- keeping $env:COMPUTERNAME" -Level Warn
+        return
+    }
+    $new
+}
+
 function Test-IsAdmin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     (New-Object Security.Principal.WindowsPrincipal $id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+
+# === 0. Restore point ========================================================
+
+# A restore point before anything changes. System Protection is switched on for
+# the Windows drive first: without it there is nothing to restore to.
+function New-RestorePoint {
+    $name = 'Restore point'
+    if ($WhatIfPreference) {
+        Write-Log "$name -- would create one before changing anything"
+        Add-Result -Step 'safety' -Name $name -Status Skipped -Detail 'WhatIf'
+        return
+    }
+    try {
+        Write-Log "$name -- creating one, this takes a minute..."
+        Enable-ComputerRestore -Drive "$env:SystemDrive\" -ErrorAction Stop
+        $warning = $null
+        Checkpoint-Computer -Description 'Before WindowsInstallAutomation' -RestorePointType MODIFY_SETTINGS `
+            -ErrorAction Stop -WarningVariable warning -WarningAction SilentlyContinue
+        if ($warning) {
+            # Windows allows one a day; the one it already made covers this run.
+            Write-Log "$name -- Windows made one in the last 24 hours, that one covers this run" -Level Skip
+            Add-Result -Step 'safety' -Name $name -Status AlreadySet
+            return
+        }
+        Write-Log "$name -- created ('Before WindowsInstallAutomation')" -Level Ok
+        Add-Result -Step 'safety' -Name $name -Status Changed
+    }
+    catch {
+        Write-Log "$name -- $($_.Exception.Message)" -Level Fail
+        Add-Result -Step 'safety' -Name $name -Status Failed -Detail $_.Exception.Message
+    }
 }
 
 
@@ -195,6 +284,36 @@ function Install-WingetApp {
     }
 }
 
+# Brings every app winget knows about up to date. Microsoft 365 is pinned
+# first so winget leaves it alone: it updates itself, and winget's own Office
+# package would rerun Microsoft's default setup (OneDrive and Teams included).
+function Update-AllApps {
+    $name = 'Update all apps'
+    if ($WhatIfPreference) {
+        $list = & winget upgrade --accept-source-agreements --disable-interactivity 2>$null
+        $count = if (($list -join "`n") -match '(\d+) upgrades? available') { $Matches[1] } else { 'all outdated' }
+        Write-Log "$name -- would update $count app(s) with winget upgrade --all"
+        Add-Result -Step 'apps' -Name $name -Status Skipped -Detail 'WhatIf'
+        return
+    }
+
+    $null = & winget pin add --id Microsoft.Office --exact --accept-source-agreements --disable-interactivity 2>&1
+    Write-Log "$name -- running winget upgrade --all, this can take a while..."
+    $out = & winget upgrade --all --silent --accept-package-agreements --accept-source-agreements `
+        --disable-interactivity 2>&1 | Out-String
+    if ($script:LogPath) { $out | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false }
+
+    # 0 = done; the other two mean "nothing to update".
+    if ($LASTEXITCODE -in 0, -1978335189, -1978335212) {
+        Write-Log "$name -- done" -Level Ok
+        Add-Result -Step 'apps' -Name $name -Status Changed
+    }
+    else {
+        Write-Log "$name -- some updates failed (winget exit $LASTEXITCODE, see the log)" -Level Fail
+        Add-Result -Step 'apps' -Name $name -Status Failed -Detail "winget exit $LASTEXITCODE -- see the log"
+    }
+}
+
 # Programs listed in Settings > Apps, matched on their name (wildcards ok).
 function Get-InstalledProgram {
     param([Parameter(Mandatory)][string]$DisplayName)
@@ -303,15 +422,17 @@ function Get-FoldersInOneDrive {
 }
 
 # Never removed, whatever remove.psd1 says. Without the first two a machine
-# has no way to install anything back. The Xbox and gaming parts stay too.
-# Packages Windows marks NonRemovable (Start, taskbar, Explorer...) are refused
-# in Remove-StoreApp below.
+# has no way to install anything back. Packages Windows marks NonRemovable
+# (Start, taskbar, Explorer...) are refused in Remove-StoreApp below.
 $script:ProtectedPackages = @(
     'Microsoft.DesktopAppInstaller', 'Microsoft.WindowsStore', 'Microsoft.SecHealthUI'
     'Microsoft.UI.Xaml*', 'Microsoft.VCLibs*', 'Microsoft.NET*', 'Microsoft.WindowsAppRuntime*'
     'Microsoft.Windows.Photos', 'Microsoft.WindowsNotepad', 'Microsoft.WindowsTerminal', 'Microsoft.Paint'
-    'Microsoft.Xbox*', 'Microsoft.GamingApp', 'Microsoft.GamingServices', 'Microsoft.Edge.GameAssist'
 )
+
+# Xbox and gaming parts: only ever removed when you answer yes to the Xbox
+# question during a run (Remove-StoreApp -Xbox), never by accident.
+$script:XboxPackages = @('Microsoft.Xbox*', 'Microsoft.GamingApp', 'Microsoft.GamingServices', 'Microsoft.Edge.GameAssist')
 
 # Windows keeps a copy of its built-in apps and installs it for every new user
 # account. Removing that copy ("deprovisioning") stops that, and Windows then
@@ -327,11 +448,16 @@ function Get-ProvisionedApp {
 # Store apps: removed for every user on the PC, and deprovisioned.
 # Anything removed here can be reinstalled from the Store.
 function Remove-StoreApp {
-    param([Parameter(Mandatory)][string]$Package, [Parameter(Mandatory)][string]$Name)
+    param([Parameter(Mandatory)][string]$Package, [Parameter(Mandatory)][string]$Name, [switch]$Xbox)
 
     if ($script:ProtectedPackages | Where-Object { $Package -like $_ }) {
         Write-Log "$Name -- refused, '$Package' is on the protected list" -Level Warn
         Add-Result -Step 'remove' -Name $Name -Status Skipped -Detail 'protected'
+        return
+    }
+    if (-not $Xbox -and ($script:XboxPackages | Where-Object { $Package -like $_ })) {
+        Write-Log "$Name -- refused, Xbox parts only go when you say yes to the Xbox question" -Level Warn
+        Add-Result -Step 'remove' -Name $Name -Status Skipped -Detail 'Xbox'
         return
     }
 
@@ -468,7 +594,7 @@ function Disable-OptionalFeature {
 }
 
 
-# === 3. Registry settings ====================================================
+# === 3 to 5. Registry settings (tweaks, personal, privacy) ===================
 
 # Writes one registry value, only if it differs from what is there.
 # Returns $true when it changed something.
@@ -478,37 +604,132 @@ function Set-RegValue {
         [string]$Value = '',
         [Parameter(Mandatory)][AllowEmptyString()]$Data,
         [string]$Type = 'DWord',
-        [Parameter(Mandatory)][string]$Label
+        [Parameter(Mandatory)][string]$Label,
+        [string]$Step = 'settings'
     )
 
     # An empty value name means the key's (default) value, and '(default)' is
     # what New-ItemProperty calls it -- it refuses an empty name.
     $valueName = if ($Value) { $Value } else { '(default)' }
+    # Long values (the Start pins list) are cut short on screen.
+    $shown = if ("$Data".Length -gt 50) { "$("$Data".Substring(0, 47))..." } else { "$Data" }
 
     try {
         $current = $null
         if (Test-Path -LiteralPath $Key) { $current = (Get-Item -LiteralPath $Key).GetValue($Value) }
-        $was = if ($null -eq $current) { 'not set' } else { "'$current'" }
+        $was = if ($null -eq $current) { 'not set' } elseif ("$current".Length -gt 50) { 'something else' } else { "'$current'" }
 
         if ($null -ne $current -and "$current" -eq "$Data") {
-            Write-Log "$Label -- already $valueName=$Data" -Level Skip
-            Add-Result -Step 'settings' -Name $Label -Status AlreadySet
+            Write-Log "$Label -- already $valueName=$shown" -Level Skip
+            Add-Result -Step $Step -Name $Label -Status AlreadySet
             return
         }
         if ($WhatIfPreference) {
-            Write-Log "$Label -- would set $valueName=$Data (now $was)"
-            Add-Result -Step 'settings' -Name $Label -Status Skipped -Detail 'WhatIf'
+            Write-Log "$Label -- would set $valueName=$shown (now $was)"
+            Add-Result -Step $Step -Name $Label -Status Skipped -Detail 'WhatIf'
             return
         }
 
         if (-not (Test-Path -LiteralPath $Key)) { New-Item -Path $Key -Force -ErrorAction Stop | Out-Null }
         New-ItemProperty -LiteralPath $Key -Name $valueName -Value $Data -PropertyType $Type -Force -ErrorAction Stop | Out-Null
-        Write-Log "$Label -- set $valueName=$Data (was $was)" -Level Ok
-        Add-Result -Step 'settings' -Name $Label -Status Changed -Detail "was $was"
+        Write-Log "$Label -- set $valueName=$shown (was $was)" -Level Ok
+        Add-Result -Step $Step -Name $Label -Status Changed -Detail "was $was"
         return $true
     }
     catch {
         Write-Log "$Label -- $($_.Exception.Message)" -Level Fail
-        Add-Result -Step 'settings' -Name $Label -Status Failed -Detail $_.Exception.Message
+        Add-Result -Step $Step -Name $Label -Status Failed -Detail $_.Exception.Message
+    }
+}
+
+# Applies every entry of one settings file. Returns $true when something that
+# needs an Explorer restart changed.
+function Set-RegList {
+    param([Parameter(Mandatory)][object[]]$Items, [Parameter(Mandatory)][string]$Step)
+    $restart = $false
+    foreach ($t in $Items) {
+        $type = if ($t.Type) { $t.Type } else { 'DWord' }
+        $changed = Set-RegValue -Key $t.Key -Value "$($t.Value)" -Data $t.Data -Type $type -Label $t.Name -Step $Step
+        if ($changed -and $t.Explorer) { $restart = $true }
+    }
+    $restart
+}
+
+
+# === 6. Extras you said yes to =================================================
+
+# The new name takes effect after the next restart.
+function Rename-ThisPC {
+    param([Parameter(Mandatory)][string]$NewName)
+    $name = 'Rename this PC'
+    if ($WhatIfPreference) {
+        Write-Log "$name -- would rename $env:COMPUTERNAME to $NewName"
+        Add-Result -Step 'extras' -Name $name -Status Skipped -Detail 'WhatIf'
+        return
+    }
+    try {
+        Rename-Computer -NewName $NewName -Force -ErrorAction Stop -WarningAction SilentlyContinue
+        Write-Log "$name -- $env:COMPUTERNAME becomes $NewName after a restart" -Level Ok
+        Add-Result -Step 'extras' -Name $name -Status Changed -Detail 'restart to finish'
+    }
+    catch {
+        Write-Log "$name -- $($_.Exception.Message)" -Level Fail
+        Add-Result -Step 'extras' -Name $name -Status Failed -Detail $_.Exception.Message
+    }
+}
+
+# A plain black picture on the desktop and the lock screen. The sign-in screen
+# shows the lock screen picture (Windows' default), so it goes black as well.
+# Both stay changeable in Settings afterwards.
+function Set-BlackBackground {
+    $name = 'Black background'
+    $file = Join-Path $script:WorkDir 'black.png'
+
+    if ((Test-Path $file) -and (Get-ItemProperty 'HKCU:\Control Panel\Desktop' -ErrorAction SilentlyContinue).WallPaper -eq $file) {
+        Write-Log "$name -- already set" -Level Skip
+        Add-Result -Step 'extras' -Name $name -Status AlreadySet
+        return
+    }
+    if ($WhatIfPreference) {
+        Write-Log "$name -- would set it on the desktop and the lock / sign-in screen"
+        Add-Result -Step 'extras' -Name $name -Status Skipped -Detail 'WhatIf'
+        return
+    }
+
+    try {
+        # The picture: 1920x1080, all black, made on the spot.
+        New-Item -ItemType Directory -Path (Split-Path $file) -Force | Out-Null
+        Add-Type -AssemblyName System.Drawing
+        $bmp = New-Object System.Drawing.Bitmap 1920, 1080
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.Clear([System.Drawing.Color]::Black)
+        $g.Dispose()
+        $bmp.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
+        $bmp.Dispose()
+
+        # Desktop: the call Settings itself makes. Shows straight away.
+        Add-Type -Namespace WIA -Name Wallpaper -MemberDefinition `
+            '[DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] public static extern bool SystemParametersInfo(int action, int param, string value, int flags);'
+        if (-not [WIA.Wallpaper]::SystemParametersInfo(0x14, 0, $file, 3)) { throw 'Windows refused the desktop background' }
+
+        # Lock screen: Windows' own lock screen API, the one apps use.
+        Add-Type -AssemblyName System.Runtime.WindowsRuntime
+        $null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]
+        $null = [Windows.System.UserProfile.LockScreen, Windows.System.UserProfile, ContentType = WindowsRuntime]
+        $asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 }
+        $awaitFile = ($asTask | Where-Object { $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } | Select-Object -First 1).MakeGenericMethod([Windows.Storage.StorageFile])
+        $awaitAction = $asTask | Where-Object { $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncAction' } | Select-Object -First 1
+        $picture = $awaitFile.Invoke($null, @([Windows.Storage.StorageFile]::GetFileFromPathAsync($file)))
+        $picture.Wait()
+        $setLock = $awaitAction.Invoke($null, @([Windows.System.UserProfile.LockScreen]::SetImageFileAsync($picture.Result)))
+        $setLock.Wait()
+
+        Write-Log "$name -- set on the desktop and the lock / sign-in screen" -Level Ok
+        Add-Result -Step 'extras' -Name $name -Status Changed
+    }
+    catch {
+        $msg = if ($_.Exception.InnerException) { $_.Exception.InnerException.Message } else { $_.Exception.Message }
+        Write-Log "$name -- $msg" -Level Fail
+        Add-Result -Step 'extras' -Name $name -Status Failed -Detail $msg
     }
 }

@@ -3,11 +3,17 @@
     Sets up Windows 11 the way I want it. Start it with Setup.cmd.
 
 .DESCRIPTION
-    Four steps, top to bottom:
-      1. Install apps       you pick them from the list in data\apps.psd1
-      2. Remove apps        everything in data\remove.psd1
-      3. Registry settings  everything in data\tweaks.psd1
-      4. Summary            what changed and what failed; then read MANUAL.md
+    First you pick apps and answer a few yes/no questions; after that it runs
+    on its own, top to bottom:
+      0. Restore point      always, before anything changes
+      1. Install apps       the ones you picked, then optionally update all apps
+      2. Remove apps        everything in data\remove.psd1 (+ Xbox if you said so)
+      3. Tweaks             data\tweaks.psd1   -- sensible on any PC
+      4. Personal           data\personal.psd1 + Start pins -- my own preferences
+      5. Privacy            data\privacy.psd1
+      6. Extras             new PC name, black background
+      7. Summary            what changed and what failed; then read MANUAL.md
+    Steps 3 to 6 only run the parts you said yes to.
 
     Run it as often as you like. Every step checks first and only changes what
     is different, so a second run just removes whatever has come back.
@@ -33,12 +39,14 @@ if (-not (Test-IsAdmin) -and -not $WhatIfPreference) {
     exit 1
 }
 
-$data     = Join-Path $PSScriptRoot 'data'
-$appList  = (Import-PowerShellDataFile "$data\apps.psd1" -ErrorAction Stop).Apps
-$removals = (Import-PowerShellDataFile "$data\remove.psd1" -ErrorAction Stop).Remove
-$tweaks   = (Import-PowerShellDataFile "$data\tweaks.psd1" -ErrorAction Stop).Tweaks
+$data       = Join-Path $PSScriptRoot 'data'
+$appList    = (Import-PowerShellDataFile "$data\apps.psd1" -ErrorAction Stop).Apps
+$removeData = Import-PowerShellDataFile "$data\remove.psd1" -ErrorAction Stop
+$tweaks     = (Import-PowerShellDataFile "$data\tweaks.psd1" -ErrorAction Stop).Tweaks
+$personal   = (Import-PowerShellDataFile "$data\personal.psd1" -ErrorAction Stop).Personal
+$privacy    = (Import-PowerShellDataFile "$data\privacy.psd1" -ErrorAction Stop).Privacy
 
-Start-Log (Join-Path $PSScriptRoot "logs\setup-$(Get-Date -Format 'yyyyMMdd-HHmmss').log")
+Start-Log (Join-Path $script:WorkDir "logs\setup-$(Get-Date -Format 'yyyyMMdd-HHmmss').log")
 Write-Host ''
 Write-Host '  Windows setup' -ForegroundColor Cyan
 if ($WhatIfPreference) { Write-Host '  DRY RUN -- nothing will be changed' -ForegroundColor Yellow }
@@ -47,12 +55,32 @@ if ([Environment]::OSVersion.Version.Build -lt 22000) {
 }
 
 
+# === Questions first, so the rest runs unattended ============================
+$chosen = @(Select-Apps -Apps $appList -Choice $Apps)
+
+Write-Host ''
+Write-Host '  A few questions. Each one defaults to the capital letter:' -ForegroundColor Cyan
+$newName     = if (Test-DefaultComputerName) { Read-NewComputerName }
+$doTweaks    = Read-YesNo 'Apply the general tweaks (data\tweaks.psd1)?' -Default $true
+$doPrivacy   = Read-YesNo 'Apply the privacy settings (data\privacy.psd1)?' -Default $true
+$updateAll   = Read-YesNo 'Update all installed apps afterwards (winget upgrade --all)?' -Default $true
+$removeXbox  = Read-YesNo 'Remove the Xbox apps too (keep them on a gaming PC)?'
+$doPersonal  = Read-YesNo 'Apply my personal preferences and Start pins (data\personal.psd1, data\start-pins.json)?'
+$blackScreen = Read-YesNo 'Plain black background on the desktop and the lock / sign-in screen?'
+Write-Log ("Answers: new name=$(if ($newName) { $newName } else { 'keep' }), tweaks=$doTweaks, privacy=$doPrivacy, " +
+    "update all=$updateAll, remove Xbox=$removeXbox, personal + pins=$doPersonal, black background=$blackScreen")
+
+
+# === 0. Restore point ========================================================
+Write-Log 'Restore point' -Level Step
+New-RestorePoint
+
+
 # === 1. Install apps =========================================================
 Write-Log 'Install apps' -Level Step
 
-$chosen = @(Select-Apps -Apps $appList -Choice $Apps)
 $haveWinget = $false
-if ($chosen | Where-Object { $_.Id }) { $haveWinget = Initialize-Winget }
+if (($chosen | Where-Object { $_.Id }) -or $updateAll) { $haveWinget = Initialize-Winget }
 
 foreach ($app in $chosen) {
     if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
@@ -67,12 +95,13 @@ foreach ($app in $chosen) {
     }
 }
 if (-not $chosen) { Write-Log 'Nothing picked.' }
+if ($updateAll -and $haveWinget) { Update-AllApps }
 
 
 # === 2. Remove apps ==========================================================
 Write-Log 'Remove apps' -Level Step
 
-foreach ($r in $removals) {
+foreach ($r in $removeData.Remove) {
     if ($r.Guard -eq 'OneDriveFolders') {
         $held = @(Get-FoldersInOneDrive) -join ', '
         if ($held) {
@@ -87,29 +116,55 @@ foreach ($r in $removals) {
     else                  { Remove-StoreApp -Package $r.Package -Name $r.Name }
 }
 
+if ($removeXbox) {
+    foreach ($x in $removeData.Xbox) { Remove-StoreApp -Package $x.Package -Name $x.Name -Xbox }
+}
+else { Write-Log 'Xbox apps -- kept' -Level Skip }
 
-# === 3. Registry settings ====================================================
-Write-Log 'Registry settings' -Level Step
-Write-Log "Windows build $([Environment]::OSVersion.Version.Build). Keys move between releases; if one stops working, re-capture it."
 
+# === 3-5. Tweaks, personal preferences, privacy ==============================
 $restartExplorer = $false
-foreach ($t in $tweaks) {
-    $type = if ($t.Type) { $t.Type } else { 'DWord' }
-    $changed = Set-RegValue -Key $t.Key -Value "$($t.Value)" -Data $t.Data -Type $type -Label $t.Name
-    if ($changed -and $t.Explorer) { $restartExplorer = $true }
+foreach ($set in @(
+        @{ Title = 'Tweaks';   Step = 'tweaks';   Wanted = $doTweaks;   Items = $tweaks }
+        @{ Title = 'Personal'; Step = 'personal'; Wanted = $doPersonal; Items = $personal }
+        @{ Title = 'Privacy';  Step = 'privacy';  Wanted = $doPrivacy;  Items = $privacy })) {
+    Write-Log $set.Title -Level Step
+    if (-not $set.Wanted) { Write-Log 'Skipped -- you said no' -Level Skip; continue }
+    if ($set.Step -eq 'tweaks') {
+        Write-Log "Windows build $([Environment]::OSVersion.Version.Build). Registry keys move between releases; if one stops working, re-capture it."
+    }
+    if (Set-RegList -Items $set.Items -Step $set.Step) { $restartExplorer = $true }
+
+    # Start pins go with the personal preferences, through Microsoft's "Configure
+    # Start Pins" policy for this account. applyOnce in the file: pinned once at
+    # the next sign-in, after that yours to change. Pins for apps that are not
+    # installed stay hidden until they are.
+    if ($set.Step -eq 'personal') {
+        $pins = (Get-Content "$data\start-pins.json" -Raw) -replace '\r?\n\s*', ''
+        $null = Set-RegValue -Key 'HKCU:\Software\Policies\Microsoft\Windows\Explorer' -Value 'ConfigureStartPins' `
+            -Data $pins -Type String -Label 'Start pins (show after signing out and in)' -Step 'personal'
+    }
 }
 
 
-# === 4. Summary ==============================================================
+# === 6. Extras ===============================================================
+Write-Log 'Extras' -Level Step
+if ($newName) { Rename-ThisPC -NewName $newName }
+if ($blackScreen) { Set-BlackBackground }
+if (-not ($newName -or $blackScreen)) { Write-Log 'None -- no new name, no black background' -Level Skip }
+
+
+# === 7. Summary ==============================================================
 Show-Summary
 
 if ($restartExplorer) {
     Write-Host ''
-    if ((Read-Host '  Restart Explorer now so the taskbar and Explorer changes show? [Y/n]') -notmatch '^[nN]') {
+    if (Read-YesNo 'Restart Explorer now so the taskbar and Explorer changes show?' -Default $true) {
         Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
         Write-Log 'Explorer restarted.' -Level Ok
     }
 }
+if ($newName -and -not $WhatIfPreference) { Write-Host ''; Write-Host " Restart the PC to finish renaming it to $newName." -ForegroundColor Yellow }
 
 Write-Host ''
 Write-Host ' Next: read MANUAL.md for what is left to do by hand.' -ForegroundColor Yellow

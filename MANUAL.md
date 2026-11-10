@@ -10,7 +10,7 @@ it as a read-through checklist.
 
 - [ ] Windows: sign in / link Microsoft account, or keep it local
 - [ ] Browser: sign in and let the profile sync
-- [ ] Bitwarden or other password manager -- do this early, the rest gets easier
+- [ ] Bitwarden browser extension: sign in early, the rest gets easier
 - [ ] Spotify, Discord, WhatsApp + Signal (link from phone), Notion, Plex, Steam / GOG / EA / Ubisoft
 
 ## Microsoft Store

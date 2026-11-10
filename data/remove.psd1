@@ -15,8 +15,9 @@
     #
     # Never removed, even if listed here (tools\Helpers.ps1 refuses): App Installer
     # (winget), the Store, Windows Security, Photos, Notepad, Terminal, Paint,
-    # runtime libraries, anything Xbox or gaming, and anything Windows itself
-    # marks as part of the system (Start, taskbar, Explorer and the like).
+    # runtime libraries, and anything Windows itself marks as part of the system
+    # (Start, taskbar, Explorer and the like). Xbox parts only through the Xbox
+    # list at the bottom.
     #
     # Kept by choice -- do not re-add: Sound Recorder, Clipchamp, Media Player.
     Remove = @(
@@ -60,5 +61,20 @@
         # Copilot+ PCs only; anywhere else the feature does not exist. The
         # 'Recall not allowed' policy in tweaks.psd1 keeps it from coming back.
         @{ Name = 'Recall';                   Feature = 'Recall' }
+    )
+
+    # Removed only when you answer yes to "Also remove the Xbox apps?" at the
+    # start of the removal step; the answer is asked every run. Keep them on a
+    # gaming PC: games that sign in with Xbox (Forza, Sea of Thieves, Game Pass)
+    # need them. Apps first, the shared parts they depend on last.
+    Xbox = @(
+        @{ Name = 'Xbox app';                 Package = 'Microsoft.GamingApp' }
+        @{ Name = 'Xbox Game Bar';            Package = 'Microsoft.XboxGamingOverlay' }
+        @{ Name = 'Xbox Game Bar plugin';     Package = 'Microsoft.XboxGameOverlay' }
+        @{ Name = 'Xbox Game Speech';         Package = 'Microsoft.XboxSpeechToTextOverlay' }
+        @{ Name = 'Edge Game Assist';         Package = 'Microsoft.Edge.GameAssist' }
+        @{ Name = 'Xbox TCUI';                Package = 'Microsoft.Xbox.TCUI' }
+        @{ Name = 'Xbox Identity Provider';   Package = 'Microsoft.XboxIdentityProvider' }
+        @{ Name = 'Gaming Services';          Package = 'Microsoft.GamingServices' }
     )
 }

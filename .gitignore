@@ -1,2 +1,3 @@
-# Run logs written by Setup.ps1
+# Run logs from older versions of Setup, which wrote them into the repo.
+# Setup now logs to C:\WindowsInstallAutomation\logs instead.
 logs/

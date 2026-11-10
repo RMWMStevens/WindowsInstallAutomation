@@ -1,0 +1,17 @@
+{
+  "applyOnce": true,
+  "pinnedList": [
+    { "packagedAppId": "windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel" },
+    { "desktopAppLink": "%ALLUSERSPROFILE%\\Microsoft\\Windows\\Start Menu\\Programs\\Visual Studio Code\\Visual Studio Code.lnk" },
+    { "packagedAppId": "SpotifyAB.SpotifyMusic_zpdnekdrzrea0!Spotify" },
+    { "packagedAppId": "38002AlexanderFrangos.TwinkleTray_m7qx9dzpwqaze!TwinkleTray" },
+    { "desktopAppLink": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\MakeMKV\\MakeMKV.lnk" },
+    { "desktopAppLink": "%ALLUSERSPROFILE%\\Microsoft\\Windows\\Start Menu\\Programs\\HandBrake\\HandBrake.lnk" },
+    { "desktopAppLink": "%ALLUSERSPROFILE%\\Microsoft\\Windows\\Start Menu\\Programs\\MKVToolNix\\MKVToolNix.lnk" },
+    { "packagedAppId": "Microsoft.4297127D64EC6_8wekyb3d8bbwe!Minecraft" },
+    { "packagedAppId": "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App" },
+    { "desktopAppLink": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Signal.lnk" },
+    { "desktopAppLink": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Discord.lnk" },
+    { "desktopAppLink": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Command & Conquer Generals Zero Hour.lnk" }
+  ]
+}
