@@ -2,7 +2,8 @@
     # General tweaks: sensible on any PC, mine or someone else's. Mostly things
     # that are simply annoying. Setup asks whether to apply them (default yes).
     # My own taste lives in data\personal.psd1; real privacy settings in
-    # data\privacy.psd1. Each is asked about separately. One block each:
+    # data\privacy-general.psd1 and privacy-personal.psd1. Each is asked about
+    # separately. One block each:
     #
     #   Key       the registry key (HKCU: = you, HKLM: = the whole PC)
     #   Value     the value's name; leave it out for the key's (default) value

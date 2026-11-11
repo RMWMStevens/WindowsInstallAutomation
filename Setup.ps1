@@ -6,13 +6,15 @@
     First you pick apps and answer a few yes/no questions; after that it runs
     on its own, top to bottom:
       0. Restore point      always, before anything changes
-      1. Remove apps        everything in data\remove.psd1 (+ Xbox if you said so)
+      1. Remove apps        everything in data\remove.psd1 (+ Xbox if you said so;
+                            on a work PC the work apps stay)
       2. Install apps       the ones you picked, then optionally update what is
                             left -- after the removals, so nothing is updated
                             only to be removed
       3. Tweaks             data\tweaks.psd1   -- sensible on any PC
       4. Personal           data\personal.psd1 + Start pins -- my own preferences
-      5. Privacy            data\privacy.psd1
+      5. Privacy            data\privacy-general.psd1, plus privacy-personal.psd1
+                            unless this is a work PC
       6. Extras             new PC name, black background
       7. Summary            what changed and what failed; then read MANUAL.md
     Steps 3 to 6 only run the parts you said yes to.
@@ -52,7 +54,8 @@ $appList    = (Import-PowerShellDataFile "$data\apps.psd1" -ErrorAction Stop).Ap
 $removeData = Import-PowerShellDataFile "$data\remove.psd1" -ErrorAction Stop
 $tweaks     = (Import-PowerShellDataFile "$data\tweaks.psd1" -ErrorAction Stop).Tweaks
 $personal   = (Import-PowerShellDataFile "$data\personal.psd1" -ErrorAction Stop).Personal
-$privacy    = (Import-PowerShellDataFile "$data\privacy.psd1" -ErrorAction Stop).Privacy
+$privacyAll = (Import-PowerShellDataFile "$data\privacy-general.psd1" -ErrorAction Stop).Privacy
+$privacyOwn = (Import-PowerShellDataFile "$data\privacy-personal.psd1" -ErrorAction Stop).Privacy
 
 Start-Log (Join-Path $script:WorkDir "logs\setup-$(Get-Date -Format 'yyyyMMdd-HHmmss').log")
 Write-Host ''
@@ -78,13 +81,16 @@ $chosen = @($chosen | Where-Object { -not $_.Ask }) + @($chosen | Where-Object {
 Write-Host ''
 Write-Host '  A few questions. Each one defaults to the capital letter:' -ForegroundColor Cyan
 $newName     = if (Test-DefaultComputerName) { Read-NewComputerName }
+# A work PC keeps its work apps (Teams, OneDrive, Outlook...), skips the privacy
+# settings an employer may rely on, and leaves app updates to IT by default.
+$workPC      = Read-YesNo 'Is this a work PC, managed by your employer?'
 $doTweaks    = Read-YesNo 'Apply the general tweaks (data\tweaks.psd1)?' -Default $true
-$doPrivacy   = Read-YesNo 'Apply the privacy settings (data\privacy.psd1)?' -Default $true
-$updateAll   = Read-YesNo 'Update all installed apps afterwards (winget upgrade --all)?' -Default $true
+$doPrivacy   = Read-YesNo 'Apply the privacy settings (data\privacy-*.psd1)?' -Default $true
+$updateAll   = Read-YesNo 'Update all installed apps afterwards (winget upgrade --all)?' -Default (-not $workPC)
 $removeXbox  = Read-YesNo 'Remove the Xbox apps too (keep them on a gaming PC)?'
 $doPersonal  = Read-YesNo 'Apply my personal preferences and Start pins (data\personal.psd1, data\start-pins.json)?'
 $blackScreen = Read-YesNo 'Plain black background on the desktop and the lock / sign-in screen?'
-Write-Log ("Answers: new name=$(if ($newName) { $newName } else { 'keep' }), tweaks=$doTweaks, privacy=$doPrivacy, " +
+Write-Log ("Answers: new name=$(if ($newName) { $newName } else { 'keep' }), work PC=$workPC, tweaks=$doTweaks, privacy=$doPrivacy, " +
     "update all=$updateAll, remove Xbox=$removeXbox, personal + pins=$doPersonal, black background=$blackScreen")
 
 
@@ -104,6 +110,11 @@ if (-not (New-RestorePoint)) {
 Write-Log 'Remove apps' -Level Step
 
 foreach ($r in $removeData.Remove) {
+    if ($workPC -and $r.KeepOnWork) {
+        Write-Log "$($r.Name) -- kept, this is a work PC" -Level Skip
+        Add-Result -Step 'remove' -Name $r.Name -Status Skipped -Detail 'work PC'
+        continue
+    }
     if ($r.Guard -eq 'OneDriveFolders') {
         $held = @(Get-FoldersInOneDrive) -join ', '
         if ($held) {
@@ -151,7 +162,7 @@ if ($updateAll -and $haveWinget) { Update-AllApps }
 # OneDrive's, were already handled in step 1 and stay with that decision.)
 $installedSomething = $script:Results | Where-Object { $_.Step -eq 'apps' -and $_.Status -eq 'Changed' -and $_.Name -ne 'Update all apps' }
 if ($installedSomething) {
-    foreach ($r in $removeData.Remove | Where-Object { $_.Package -and -not $_.Guard }) {
+    foreach ($r in $removeData.Remove | Where-Object { $_.Package -and -not $_.Guard -and -not ($workPC -and $_.KeepOnWork) }) {
         if (Get-InstalledStoreApp $r.Package) { Remove-StoreApp -Package $r.Package -Name "$($r.Name) (came back with an install)" }
     }
 }
@@ -162,7 +173,7 @@ $restartExplorer = $false
 foreach ($set in @(
         @{ Title = 'Tweaks';   Step = 'tweaks';   Wanted = $doTweaks;   Items = $tweaks }
         @{ Title = 'Personal'; Step = 'personal'; Wanted = $doPersonal; Items = $personal }
-        @{ Title = 'Privacy';  Step = 'privacy';  Wanted = $doPrivacy;  Items = $privacy })) {
+        @{ Title = 'Privacy';  Step = 'privacy';  Wanted = $doPrivacy;  Items = $privacyAll })) {
     Write-Log $set.Title -Level Step
     if (-not $set.Wanted) { Write-Log 'Skipped -- you said no' -Level Skip; continue }
     if ($set.Step -eq 'tweaks') {
@@ -178,6 +189,12 @@ foreach ($set in @(
         $pins = (Get-Content "$data\start-pins.json" -Raw) -replace '\r?\n\s*', ''
         $null = Set-RegValue -Key 'HKCU:\Software\Policies\Microsoft\Windows\Explorer' -Value 'ConfigureStartPins' `
             -Data $pins -Type String -Label 'Start pins (show after signing out and in)' -Step 'personal'
+    }
+
+    # The privacy settings an employer may rely on: only on my own PCs.
+    if ($set.Step -eq 'privacy') {
+        if ($workPC) { Write-Log 'Personal privacy settings (data\privacy-personal.psd1) -- skipped, this is a work PC' -Level Skip }
+        elseif (Set-RegList -Items $privacyOwn -Step 'privacy') { $restartExplorer = $true }
     }
 }
 

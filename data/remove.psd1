@@ -13,6 +13,10 @@
     # folder is still backed up into OneDrive -- uninstalling then would leave
     # those folders pointing at files that may only exist in the cloud.
     #
+    # KeepOnWork = $true keeps an app when you answer yes to "Is this a work PC?":
+    # Teams, OneDrive, Outlook, Quick Assist (IT helpdesks use it), the
+    # Microsoft 365 apps, To Do, Power Automate and Sticky Notes.
+    #
     # Never removed, even if listed here (tools\Helpers.ps1 refuses): App Installer
     # (winget), the Store, Windows Security, Photos, Notepad, Terminal, Paint,
     # runtime libraries, and anything Windows itself marks as part of the system
@@ -31,32 +35,32 @@
         @{ Name = 'Microsoft Start feed';     Package = 'Microsoft.StartExperiencesApp' }   # news for Widgets
         @{ Name = 'Get Help';                 Package = 'Microsoft.GetHelp' }
         @{ Name = 'Tips';                     Package = 'Microsoft.Getstarted' }
-        @{ Name = 'Office Hub';               Package = 'Microsoft.MicrosoftOfficeHub' }
+        @{ Name = 'Office Hub';               Package = 'Microsoft.MicrosoftOfficeHub'; KeepOnWork = $true }
         @{ Name = 'Solitaire';                Package = 'Microsoft.MicrosoftSolitaireCollection' }
         @{ Name = 'People';                   Package = 'Microsoft.People' }
-        @{ Name = 'Power Automate';           Package = 'Microsoft.PowerAutomateDesktop' }
-        @{ Name = 'To Do';                    Package = 'Microsoft.Todos' }
+        @{ Name = 'Power Automate';           Package = 'Microsoft.PowerAutomateDesktop'; KeepOnWork = $true }
+        @{ Name = 'To Do';                    Package = 'Microsoft.Todos'; KeepOnWork = $true }
         @{ Name = 'Feedback Hub';             Package = 'Microsoft.WindowsFeedbackHub' }
         @{ Name = 'Maps';                     Package = 'Microsoft.WindowsMaps' }
         @{ Name = 'Movies & TV';              Package = 'Microsoft.ZuneVideo' }
         @{ Name = 'Mail & Calendar';          Package = 'microsoft.windowscommunicationsapps' }
         @{ Name = 'Cortana';                  Package = 'Microsoft.549981C3F5F10' }
-        @{ Name = 'Sticky Notes';             Package = 'Microsoft.MicrosoftStickyNotes' }
-        @{ Name = 'New Outlook';              Package = 'Microsoft.OutlookForWindows' }
-        @{ Name = 'Quick Assist';             Package = 'MicrosoftCorporationII.QuickAssist' }
+        @{ Name = 'Sticky Notes';             Package = 'Microsoft.MicrosoftStickyNotes'; KeepOnWork = $true }
+        @{ Name = 'New Outlook';              Package = 'Microsoft.OutlookForWindows'; KeepOnWork = $true }
+        @{ Name = 'Quick Assist';             Package = 'MicrosoftCorporationII.QuickAssist'; KeepOnWork = $true }
         @{ Name = 'Phone Link';               Package = 'Microsoft.YourPhone' }
         @{ Name = 'Mobile devices';           Package = 'MicrosoftWindows.CrossDevice' }   # Phone Link's background half
         @{ Name = 'Copilot';                  Package = 'Microsoft.Copilot' }
-        @{ Name = 'Microsoft 365 companions'; Package = 'Microsoft.M365Companions' }   # Office may put it back; the next run removes it
+        @{ Name = 'Microsoft 365 companions'; Package = 'Microsoft.M365Companions'; KeepOnWork = $true }   # Office may put it back; the next run removes it
         @{ Name = 'Family Safety';            Package = 'MicrosoftCorporationII.MicrosoftFamily' }
 
         # OneDrive and Teams, every part of them. data\office.xml keeps
         # Microsoft 365 from installing them again.
-        @{ Name = 'OneDrive';                 Uninstall = 'Microsoft OneDrive'; StopProcess = 'OneDrive'; Guard = 'OneDriveFolders' }
-        @{ Name = 'OneDrive shell integration'; Package = 'Microsoft.OneDriveSync'; Guard = 'OneDriveFolders' }
-        @{ Name = 'Teams';                    Package = 'MSTeams' }
+        @{ Name = 'OneDrive';                 Uninstall = 'Microsoft OneDrive'; StopProcess = 'OneDrive'; Guard = 'OneDriveFolders'; KeepOnWork = $true }
+        @{ Name = 'OneDrive shell integration'; Package = 'Microsoft.OneDriveSync'; Guard = 'OneDriveFolders'; KeepOnWork = $true }
+        @{ Name = 'Teams';                    Package = 'MSTeams'; KeepOnWork = $true }
         @{ Name = 'Teams (personal)';         Package = 'MicrosoftTeams' }
-        @{ Name = 'Teams Outlook add-in';     Uninstall = 'Microsoft Teams Meeting Add-in*' }
+        @{ Name = 'Teams Outlook add-in';     Uninstall = 'Microsoft Teams Meeting Add-in*'; KeepOnWork = $true }
 
         # Copilot+ PCs only; anywhere else the feature does not exist. The
         # 'Recall not allowed' policy in tweaks.psd1 keeps it from coming back.
