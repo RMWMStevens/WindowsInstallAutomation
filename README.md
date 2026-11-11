@@ -157,6 +157,8 @@ what it does and where it comes from.
   Settings opens on System instead of its Home page.
 - **Edge** really closes when you close it and no longer starts at sign-in, so
   it uses no memory while you are not using it.
+- **Startup apps** start as soon as you sign in, instead of about 10 seconds
+  later.
 - **Dark mode** for Windows and apps.
 - **Typing**: no autocorrect or text suggestions, and pressing Shift five times
   or holding right Shift no longer turns on Sticky Keys or Filter Keys.

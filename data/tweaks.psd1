@@ -217,6 +217,20 @@
            Key  = 'HKCU:\Software\Microsoft\TabletTip\1.7'
            Value = 'EnableAutocorrection'; Data = 0 }
 
+        # --- startup apps start straight away ---------------------------
+        # Since Windows 8, Explorer holds back the apps that start with Windows
+        # (Settings > Apps > Startup) until about 10 seconds after the desktop
+        # appears, and until the PC has gone quiet. That made the desktop usable
+        # sooner on a slow hard disk; on an SSD it only makes tray apps late.
+        @{ Name = 'Startup apps: no delay'
+           Why  = '(unchecked, not documented by Microsoft) No switch for it anywhere; explorer.exe on build 26300 still reads this value (Nov 2026). On a PC with a hard disk, comment both out. Delete the values to get the delay back.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize'
+           Value = 'StartupDelayInMSec'; Data = 0 }
+        @{ Name = 'Startup apps: no waiting for the PC to go quiet'
+           Why  = '(unchecked, not documented by Microsoft) The other half of the delay above; also read by explorer.exe on build 26300.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize'
+           Value = 'WaitForIdleState'; Data = 0 }
+
         # --- system -----------------------------------------------------
         @{ Name = 'Clipboard history on'
            Why  = 'Win+V keeps a history of what you copied. Stays on this PC; syncing across devices is a separate switch and stays off.'
