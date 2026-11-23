@@ -1,38 +1,21 @@
 @{
-    # Everything here is removed on every run. If something comes back after an
-    # update, the next run removes it again. Three kinds of entry:
-    #
-    #   Package    a Store app. Removed for every user, and also from the copy
-    #              Windows keeps for new users, so it stays gone. Find the name:
-    #                Get-AppxPackage *<part of name>* | Select-Object Name
-    #   Uninstall  a normal desktop program, by its name in Settings > Apps
-    #              (wildcards ok). StopProcess is closed first.
-    #   Feature    a Windows optional feature ("Turn Windows features on or off").
-    #
-    # Guard = 'OneDriveFolders' refuses while Desktop, Documents or another user
-    # folder is still backed up into OneDrive -- uninstalling then would leave
-    # those folders pointing at files that may only exist in the cloud.
-    #
-    # KeepOnWork = $true keeps an app when you answer yes to "Is this a work PC?":
-    # Teams, OneDrive, Outlook, Quick Assist (IT helpdesks use it), the
-    # Microsoft 365 apps, To Do, Power Automate and Sticky Notes.
-    #
-    # Never removed, even if listed here (tools\Helpers.ps1 refuses): App Installer
-    # (winget), the Store, Windows Security, Photos, Notepad, Terminal, Paint,
-    # runtime libraries, and anything Windows itself marks as part of the system
-    # (Start, taskbar, Explorer and the like). Xbox parts only through the Xbox
-    # list at the bottom.
-    #
-    # Kept by choice -- do not re-add: Sound Recorder, Clipchamp, Media Player.
+    # Removed on every run, so whatever comes back goes again. Kinds of entry:
+    #   Package     a Store app, removed for every account and from Windows' copy
+    #               for new accounts. Name: Get-AppxPackage *name* | Select Name
+    #   Uninstall   a desktop program, by its name in Settings > Apps (wildcards ok)
+    #   Feature     a Windows optional feature
+    #   KeepOnWork  kept when you answer yes to "Is this a work PC?"
+    #   Guard       OneDriveFolders: refused while user folders are backed up into OneDrive
+    # tools\Helpers.ps1 refuses system parts (Store, winget, Security, Photos,
+    # Notepad, Terminal, Paint, runtimes), and Xbox parts outside the Xbox list.
     Remove = @(
         @{ Name = 'Bing News';                Package = 'Microsoft.BingNews' }
         @{ Name = 'Bing Weather';             Package = 'Microsoft.BingWeather' }
-        @{ Name = 'Microsoft Bing';           Package = 'Microsoft.BingSearch' }   # web results in Windows search
-        # Widgets. Windows blocks scripts from setting the policy that switches
-        # them off, so the app goes instead. Reinstall: "Windows Web Experience
-        # Pack" in the Store.
+        @{ Name = 'Microsoft Bing';           Package = 'Microsoft.BingSearch' }   # web results in search
+        # Windows blocks the policy that turns Widgets off, so it's uninstalled instead.
+        # To get it back: "Windows Web Experience Pack" in the Store.
         @{ Name = 'Widgets';                  Package = 'MicrosoftWindows.Client.WebExperience' }
-        @{ Name = 'Microsoft Start feed';     Package = 'Microsoft.StartExperiencesApp' }   # news for Widgets
+        @{ Name = 'Microsoft Start feed';     Package = 'Microsoft.StartExperiencesApp' }
         @{ Name = 'Get Help';                 Package = 'Microsoft.GetHelp' }
         @{ Name = 'Tips';                     Package = 'Microsoft.Getstarted' }
         @{ Name = 'Office Hub';               Package = 'Microsoft.MicrosoftOfficeHub'; KeepOnWork = $true }
@@ -49,38 +32,23 @@
         @{ Name = 'New Outlook';              Package = 'Microsoft.OutlookForWindows'; KeepOnWork = $true }
         @{ Name = 'Quick Assist';             Package = 'MicrosoftCorporationII.QuickAssist'; KeepOnWork = $true }
         @{ Name = 'Phone Link';               Package = 'Microsoft.YourPhone' }
-        @{ Name = 'Mobile devices';           Package = 'MicrosoftWindows.CrossDevice' }   # Phone Link's background half
+        @{ Name = 'Mobile devices';           Package = 'MicrosoftWindows.CrossDevice' }   # Phone Link's background part
         @{ Name = 'Copilot';                  Package = 'Microsoft.Copilot' }
-        @{ Name = 'Copilot+ AI Hub';          Package = 'Microsoft.Windows.AIHub' }   # Copilot+ PCs only
-        @{ Name = 'Microsoft 365 companions'; Package = 'Microsoft.M365Companions'; KeepOnWork = $true }   # Office may put it back; the next run removes it
+        @{ Name = 'Copilot+ AI Hub';          Package = 'Microsoft.Windows.AIHub' }
+        @{ Name = 'Microsoft 365 companions'; Package = 'Microsoft.M365Companions'; KeepOnWork = $true }
         @{ Name = 'Family Safety';            Package = 'MicrosoftCorporationII.MicrosoftFamily' }
-
-        # OneDrive and Teams, every part of them. data\office.xml keeps
-        # Microsoft 365 from installing them again.
+        # OneDrive and Teams, every part. data\office.xml keeps Microsoft 365 from bringing them back.
         @{ Name = 'OneDrive';                 Uninstall = 'Microsoft OneDrive'; StopProcess = 'OneDrive'; Guard = 'OneDriveFolders'; KeepOnWork = $true }
         @{ Name = 'OneDrive shell integration'; Package = 'Microsoft.OneDriveSync'; Guard = 'OneDriveFolders'; KeepOnWork = $true }
         @{ Name = 'Teams';                    Package = 'MSTeams'; KeepOnWork = $true }
         @{ Name = 'Teams (personal)';         Package = 'MicrosoftTeams' }
         @{ Name = 'Teams Outlook add-in';     Uninstall = 'Microsoft Teams Meeting Add-in*'; KeepOnWork = $true }
-
-        # Copilot+ PCs only; anywhere else the feature does not exist. The
-        # 'Recall not allowed' policy in tweaks.psd1 keeps it from coming back.
-        @{ Name = 'Recall';                   Feature = 'Recall' }
+        @{ Name = 'Recall';                   Feature = 'Recall' }   # Copilot+ PCs only
     )
 
-    # Sponsored apps: games, streaming and social media apps that Windows or
-    # the PC maker put on the PC unasked. Only those go: an app from this list
-    # counts as sponsored when it is in Windows' copy for new users, which
-    # every new account gets automatically. One that is only installed for an
-    # account was got from the Store by someone on the PC, so it stays -- the
-    # sponsored tiles in Start are only shortcuts that download the app when
-    # clicked. (Those tiles themselves are no app at all: nothing to remove,
-    # no memory used. Unpin them by hand.)
-    #
-    # When any sponsored apps are found, Setup lists them straight after the
-    # app menu and asks which to keep; a PC with none is not asked. The list
-    # comes from Win11Debloat (github.com/Raphire/Win11Debloat). A * matches
-    # any text, for names whose publisher prefix differs per app.
+    # Removed only when Windows or the PC maker put them there (they are in
+    # Windows' copy for new accounts), unless you keep them. Installed by
+    # someone from the Store: they stay. List from Win11Debloat.
     Sponsored = @(
         @{ Name = 'ACG Media Player';         Package = '*ACGMediaPlayer*' }
         @{ Name = 'Actipro Software';         Package = '*ActiproSoftwareLLC*' }
@@ -124,10 +92,8 @@
         @{ Name = 'WinZip';                   Package = '*WinZipUniversal*' }
     )
 
-    # Removed only when you answer yes to "Also remove the Xbox apps?" at the
-    # start of the removal step; the answer is asked every run. Keep them on a
-    # gaming PC: games that sign in with Xbox (Forza, Sea of Thieves, Game Pass)
-    # need them. Apps first, the shared parts they depend on last.
+    # Only with a yes to the Xbox question. Keep them on a gaming PC: games that
+    # sign in with Xbox need them. Apps first, shared parts last.
     Xbox = @(
         @{ Name = 'Xbox app';                 Package = 'Microsoft.GamingApp' }
         @{ Name = 'Xbox Game Bar';            Package = 'Microsoft.XboxGamingOverlay' }

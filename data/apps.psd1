@@ -1,34 +1,25 @@
 @{
-    # Every app Setup can install. Setup shows them as a numbered list, grouped
-    # by Group, and you pick what you want -- nothing is installed unless picked.
-    #
-    #   Id      winget package ID. Find it with:  winget search "<name>"
-    #   Source  'msstore' for Store apps. Also use the Store build when that is
-    #           the one you already have: winget sees the Store build and the
-    #           winget build as two different apps and would install both.
-    #   Ask     $true = big or licensed: one extra question right after the menu
-    #           (skipped when already installed), and installed after the rest
-    #   Note    printed when the app is installed
-    #
-    # Check every ID still exists with:  .\tools\Test-AppIds.ps1
-    #
-    # An app winget cannot install reliably can be downloaded directly instead,
-    # with Url / Signer / Args / Detect -- see Microsoft 365 below. Apps that are
-    # in neither winget nor the Store (FileZilla, say) are not listed here.
+    # The app menu. Nothing is installed unless picked.
+    #   Id      winget ID (winget search "<name>"). Check them all: tools\Test-AppIds.ps1
+    #   Source  'msstore' for Store apps. Use it too when you already have the Store
+    #           version: winget sees the two versions as different apps.
+    #   Ask     $true: big or licensed, one more question and installed last
+    #   Note    shown when it installs
+    #   Url, Signer, Args, Detect: a direct download, for apps winget cannot install reliably
     Apps = @(
         @{ Group = 'Core'; Name = '7-Zip';          Id = '7zip.7zip' }
         @{ Group = 'Core'; Name = 'Everything';     Id = 'voidtools.Everything' }
         @{ Group = 'Core'; Name = 'VLC';            Id = 'VideoLAN.VLC' }
         @{ Group = 'Core'; Name = 'HWiNFO';         Id = 'REALiX.HWiNFO' }
         @{ Group = 'Core'; Name = 'CPU-Z';          Id = 'CPUID.CPU-Z' }
-        # Not winget's Microsoft.Office: that package checks this same setup.exe
-        # against a stored hash and fails every time Microsoft updates the file.
+        # winget's Microsoft.Office checks setup.exe against a stored hash and
+        # fails whenever Microsoft updates it, so this downloads it directly.
         @{ Group = 'Core'; Name = 'Microsoft 365';  Ask = $true
            Url    = 'https://officecdn.microsoft.com/pr/wsus/setup.exe'   # Office Deployment Tool
-           Signer = 'Microsoft Corporation'        # refused unless signed by this publisher
+           Signer = 'Microsoft Corporation'
            Args   = '/configure "{data}\office.xml"'   # {data} = this folder
-           Detect = 'Microsoft 365*'               # name in Settings > Apps once installed
-           Note   = 'Word, Excel and PowerPoint only (data\office.xml). Sign in afterwards -- see MANUAL.md' }
+           Detect = 'Microsoft 365*'                    # name in Settings > Apps
+           Note   = 'Word, Excel and PowerPoint only, not activated. Open Word and sign in with an account that has a licence.' }
 
         @{ Group = 'Social'; Name = 'WhatsApp';     Id = '9NKSQGP7F2NH'; Source = 'msstore' }
         @{ Group = 'Social'; Name = 'Discord';      Id = 'Discord.Discord' }
@@ -52,7 +43,7 @@
         @{ Group = 'Dev'; Name = 'Node.js LTS';     Id = 'OpenJS.NodeJS.LTS' }
         @{ Group = 'Dev'; Name = 'Postman';         Id = 'Postman.Postman' }
         @{ Group = 'Dev'; Name = 'Visual Studio Community 2026'; Id = 'Microsoft.VisualStudio.Community'
-           Note = 'Large download. Sign in with a Microsoft account within 30 days -- see MANUAL.md' }
+           Note = 'Large download. Sign in with a Microsoft account within 30 days, or it locks until you do.' }
 
         @{ Group = 'Gaming'; Name = 'Steam';           Id = 'Valve.Steam' }
         @{ Group = 'Gaming'; Name = 'GOG Galaxy';      Id = 'GOG.Galaxy' }

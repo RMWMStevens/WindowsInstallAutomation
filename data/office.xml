@@ -1,19 +1,10 @@
 <Configuration>
   <!--
-    Office Deployment Tool configuration, used by the 'Microsoft 365' entry in
-    data\apps.psd1 (setup.exe /configure office.xml).
-
-    Installs only Word, Excel and PowerPoint. Everything else Microsoft 365
-    Apps would bring along is excluded below, both Outlooks included.
-    (No double hyphens in these comments: XML does not allow them.)
-
-    Product O365ProPlusRetail = Microsoft 365 Apps, the same product winget's
-    Microsoft.Office installs. For a Microsoft 365 Personal / Family licence use
-    O365HomePremRetail instead.
-
-    ExcludeApp IDs: https://learn.microsoft.com/microsoft-365-apps/deploy/office-deployment-tool-configuration-options
-    This only shapes a new install. Setup skips Office when it is already there,
-    so an existing install keeps whatever apps it has.
+    Microsoft 365 with Word, Excel and PowerPoint only, for the Office
+    Deployment Tool (see data\apps.psd1). Only used for a new install: Setup
+    skips Office when it is already there. For a Personal or Family licence,
+    use O365HomePremRetail. ExcludeApp IDs:
+    https://learn.microsoft.com/microsoft-365-apps/deploy/office-deployment-tool-configuration-options
   -->
   <Add OfficeClientEdition="64" Channel="Current">
     <Product ID="O365ProPlusRetail">
@@ -26,9 +17,7 @@
       <ExcludeApp ID="OutlookForWindows" />  <!-- the new Outlook -->
       <ExcludeApp ID="Lync" />               <!-- Skype for Business -->
       <ExcludeApp ID="Teams" />
-      <!-- OneDrive: Microsoft says to use Groove; OneDrive is excluded too to be sure.
-           data\remove.psd1 removes both OneDrive and Teams as well. -->
-      <ExcludeApp ID="Groove" />
+      <ExcludeApp ID="Groove" />             <!-- OneDrive, per Microsoft -->
       <ExcludeApp ID="OneDrive" />
     </Product>
   </Add>
