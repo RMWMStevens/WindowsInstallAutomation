@@ -51,6 +51,7 @@
         @{ Name = 'Phone Link';               Package = 'Microsoft.YourPhone' }
         @{ Name = 'Mobile devices';           Package = 'MicrosoftWindows.CrossDevice' }   # Phone Link's background half
         @{ Name = 'Copilot';                  Package = 'Microsoft.Copilot' }
+        @{ Name = 'Copilot+ AI Hub';          Package = 'Microsoft.Windows.AIHub' }   # Copilot+ PCs only
         @{ Name = 'Microsoft 365 companions'; Package = 'Microsoft.M365Companions'; KeepOnWork = $true }   # Office may put it back; the next run removes it
         @{ Name = 'Family Safety';            Package = 'MicrosoftCorporationII.MicrosoftFamily' }
 
@@ -65,6 +66,62 @@
         # Copilot+ PCs only; anywhere else the feature does not exist. The
         # 'Recall not allowed' policy in tweaks.psd1 keeps it from coming back.
         @{ Name = 'Recall';                   Feature = 'Recall' }
+    )
+
+    # Sponsored apps: games, streaming and social media apps that Windows or
+    # the PC maker put on the PC unasked. Only those go: an app from this list
+    # counts as sponsored when it is in Windows' copy for new users, which
+    # every new account gets automatically. One that is only installed for an
+    # account was got from the Store by someone on the PC, so it stays -- the
+    # sponsored tiles in Start are only shortcuts that download the app when
+    # clicked. (Those tiles themselves are no app at all: nothing to remove,
+    # no memory used. Unpin them by hand.)
+    #
+    # When any sponsored apps are found, Setup lists them straight after the
+    # app menu and asks which to keep; a PC with none is not asked. The list
+    # comes from Win11Debloat (github.com/Raphire/Win11Debloat). A * matches
+    # any text, for names whose publisher prefix differs per app.
+    Sponsored = @(
+        @{ Name = 'ACG Media Player';         Package = '*ACGMediaPlayer*' }
+        @{ Name = 'Actipro Software';         Package = '*ActiproSoftwareLLC*' }
+        @{ Name = 'Adobe Photoshop Express';  Package = 'AdobeSystemsIncorporated.AdobePhotoshopExpress' }
+        @{ Name = 'Amazon';                   Package = 'Amazon.com.Amazon' }
+        @{ Name = 'Prime Video';              Package = 'AmazonVideo.PrimeVideo' }
+        @{ Name = 'Asphalt 8';                Package = '*Asphalt8Airborne*' }
+        @{ Name = 'Autodesk SketchBook';      Package = '*AutodeskSketchBook*' }
+        @{ Name = 'Caesars Slots';            Package = '*CaesarsSlotsFreeCasino*' }
+        @{ Name = 'Cooking Fever';            Package = '*COOKINGFEVER*' }
+        @{ Name = 'CyberLink Media Suite';    Package = '*CyberLinkMediaSuiteEssentials*' }
+        @{ Name = 'Disney Magic Kingdoms';    Package = '*DisneyMagicKingdoms*' }
+        @{ Name = 'Disney+';                  Package = 'Disney.37853FC22B2CE' }
+        @{ Name = 'Drawboard PDF';            Package = '*DrawboardPDF*' }
+        @{ Name = 'Duolingo';                 Package = '*Duolingo-LearnLanguagesforFree*' }
+        @{ Name = 'Facebook';                 Package = 'FACEBOOK.FACEBOOK' }
+        @{ Name = 'Instagram';                Package = 'Facebook.Instagram' }
+        @{ Name = 'FarmVille 2';              Package = '*FarmVille2CountryEscape*' }
+        @{ Name = 'Flipboard';                Package = '*Flipboard*' }
+        @{ Name = 'Hidden City';              Package = '*HiddenCity*' }
+        @{ Name = 'Hulu';                     Package = 'HULULLC.HULUPLUS' }
+        @{ Name = 'iHeartRadio';              Package = '*iHeartRadio*' }
+        @{ Name = 'Bubble Witch 3 Saga';      Package = 'king.com.BubbleWitch3Saga' }
+        @{ Name = 'Candy Crush Saga';         Package = 'king.com.CandyCrushSaga' }
+        @{ Name = 'Candy Crush Soda Saga';    Package = 'king.com.CandyCrushSodaSaga' }
+        @{ Name = 'LinkedIn';                 Package = '*LinkedInforWindows*' }
+        @{ Name = 'March of Empires';         Package = '*MarchofEmpires*' }
+        @{ Name = 'Netflix';                  Package = '4DF9E0F8.Netflix' }
+        @{ Name = 'NYT Crossword';            Package = '*NYTCrossword*' }
+        @{ Name = 'One Calendar';             Package = '*OneCalendar*' }
+        @{ Name = 'Pandora';                  Package = '*PandoraMediaInc*' }
+        @{ Name = 'Phototastic Collage';      Package = '*PhototasticCollage*' }
+        @{ Name = 'PicsArt';                  Package = '*PicsArt-PhotoStudio*' }
+        @{ Name = 'Polarr Photo Editor';      Package = '*PolarrPhotoEditorAcademicEdition*' }
+        @{ Name = 'Royal Revolt';             Package = 'flaregamesGmbH.RoyalRevolt' }
+        @{ Name = 'Live Wallpaper';           Package = 'Sidia.LiveWallpaper' }
+        @{ Name = 'Sling TV';                 Package = '*SlingTV*' }
+        @{ Name = 'Spotify';                  Package = 'SpotifyAB.SpotifyMusic' }
+        @{ Name = 'TikTok';                   Package = 'BytedancePte.Ltd.TikTok' }
+        @{ Name = 'TuneIn Radio';             Package = '*TuneInRadio*' }
+        @{ Name = 'WinZip';                   Package = '*WinZipUniversal*' }
     )
 
     # Removed only when you answer yes to "Also remove the Xbox apps?" at the

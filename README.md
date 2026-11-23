@@ -33,11 +33,23 @@ Windows update, say.
    | Remove the Xbox apps too? Say no on a gaming PC -- games that sign in with Xbox need them.                                  | no                   |
    | Apply my personal preferences and Start pins? Say no on someone else's PC. Pins show after signing out and in.              | no                   |
    | Plain black background on the desktop and the lock / sign-in screen?                                                        | no                   |
+   | At the end, clear out old Windows update files? Takes 10+ minutes; worth it after a fresh install's updates.                | no                   |
+
+   **Running it again on the same PC?** Setup first shows the answers of the
+   last run there and asks "Same answers as last time?" -- just press Enter and
+   it skips the questions above. Handy after a restart (say, when the clean-up
+   had to wait for one) or after some updates, and no risk of a different
+   answer typed in a hurry. Two answers are never repeated this way: the new
+   name, and the black background, because someone may have picked another
+   background since. A question added to Setup after that run is asked on its
+   own, and remembered from then on. Answer `n` to get every question again.
+   The app menu still shows; Enter installs nothing.
 
    After that it runs on its own: a restore point first, then it removes the
-   bloat, installs your apps, updates what is left, and applies what you said
-   yes to. If no restore point can be made, it stops and asks before changing
-   anything. When it is done, it tells you if a restart is needed.
+   bloat, installs your apps, updates what is left, applies what you said yes
+   to, and cleans up last if you asked. If no restore point can be made, it
+   stops and asks before changing anything. When it is done, it tells you if a
+   restart is needed.
 5. Read `MANUAL.md` and work through what is left to do by hand.
 
 No internet in PowerShell, or want a local copy? Download the repo (**Code >
@@ -84,6 +96,15 @@ it is simply skipped. It installs last, after the quicker apps. Setup only
 installs it; activating it is up to you (sign in with the account that holds
 the licence).
 
+**Sponsored apps** (Candy Crush, TikTok, Netflix and the like) that Windows or
+the PC maker put on the PC are removed. One that someone installed from the
+Store stays: the sponsored tiles in Start only download the app once clicked,
+and Setup can tell the difference. When the PC has any that came with it,
+Setup lists them straight after the menu, so you can keep some -- on a
+friend's PC, say. Type their numbers, or just press Enter to remove them all.
+A PC without any is not asked. The tiles themselves are no app (nothing
+installed, no memory used); unpin them by hand.
+
 ## What Setup does
 
 In the order it runs. The parts under **Always** happen on every run, whatever
@@ -98,7 +119,9 @@ answers decide the rest.
   Widgets, Tips, Get Help, Solitaire, People, Maps, Movies & TV, Mail &
   Calendar, Cortana, Feedback Hub, Phone Link, Copilot, Family Safety, the
   Microsoft 365 app and its companions, To Do, Power Automate, Sticky Notes,
-  new Outlook, Quick Assist, OneDrive, Teams, and Recall on Copilot+ PCs. Store
+  new Outlook, Quick Assist, OneDrive, Teams, and Recall and the AI Hub on
+  Copilot+ PCs. Also the sponsored apps that came with the PC, except the
+  ones you keep. Store
   apps go for every account on the PC, including accounts made later. Two
   exceptions: on a work PC the work apps stay (below), and OneDrive stays
   while Desktop or Documents are backed up into it.
@@ -111,8 +134,8 @@ answers decide the rest.
 **Never removed**: Edge, Windows Search, the Store, App Installer (winget),
 Windows Security, Photos, Notepad, Terminal, Paint, Sound Recorder, Clipchamp
 and Media Player -- nor the Xbox apps, unless you say so. Setup also leaves
-services, scheduled tasks, the firewall, antivirus settings and activation
-alone.
+services (except the Windows AI one, under privacy), scheduled tasks, the
+firewall, antivirus settings and activation alone.
 
 ### Your answers decide
 
@@ -136,6 +159,13 @@ alone.
 - **Black background: yes** -- the desktop, lock screen and sign-in screen
   turn plain black.
 - **A new name** -- the PC is renamed; the name changes at the next restart.
+- **Clean-up: yes** -- as the very last step,
+  `DISM /Online /Cleanup-Image /StartComponentCleanup` deletes the old copies
+  of Windows parts that updates have replaced. Windows does this itself about
+  once a month, 30 days after each update; this just does it now. Without
+  `/ResetBase`, so installed updates can still be uninstalled. Skipped while
+  Windows is waiting for a restart (DISM refuses then): restart, run Setup
+  again and say yes.
 
 ## What the settings do
 
@@ -146,6 +176,8 @@ what it does and where it comes from.
 
 - **Search** finds things on this PC only: no Bing results, web suggestions or
   highlights. The search box leaves the taskbar; typing in Start still searches.
+  Search no longer runs a hidden Edge (WebView2) to show its results, which
+  saves roughly 75 to 150 MB of memory.
 - **Taskbar**: icons on the left, no chat or task view button, and the clock
   also shows in the notification center.
 - **Explorer** opens on This PC and the copy window shows its details. F1 no
@@ -153,10 +185,16 @@ what it does and where it comes from.
   tabs.
 - **No nags**: no tips, suggestions or "finish setting up" screens; no
   recommendations or account notices in Start; no fun facts or widgets on the
-  lock screen; no feedback requests; no sponsored apps installed unasked.
-  Settings opens on System instead of its Home page.
+  lock screen; no feedback requests; no sponsored apps installed unasked; no
+  OneDrive and Microsoft 365 banners in Explorer; no "use your phone with
+  Windows" suggestions. Settings opens on System instead of its Home page, and
+  shows no Microsoft 365 ads (Education and Enterprise).
 - **Edge** really closes when you close it and no longer starts at sign-in, so
-  it uses no memory while you are not using it.
+  it uses no memory while you are not using it. No news feed, sponsored tiles,
+  first-run screens, "make Edge your default" prompts, shopping assistant,
+  Rewards, Acrobat button or feedback requests.
+- **Battery**: a sleeping laptop on battery drops Wi-Fi instead of draining
+  the battery on it; mail and messages arrive once it wakes.
 - **Startup apps** start as soon as you sign in, instead of about 10 seconds
   later.
 - **Dark mode** for Windows and apps.
@@ -171,18 +209,20 @@ what it does and where it comes from.
 
 - Explorer shows hidden files, and no recently used files or frequent folders.
 - Start shows no recently added apps, and gets my pins.
-- Starting up and shutting down show what Windows is waiting on; a blue screen
-  shows the error details, which usually name the driver at fault.
+- A blue screen shows the error details, which usually name the driver at fault.
 
 **Privacy, every PC** (`data\privacy-general.psd1`):
 
 - Apps get no advertising ID, so ads are not personalised, and Microsoft does
   not use your diagnostic data to tailor tips and offers.
-- Windows keeps no activity history of what you do.
+- Windows keeps no activity history of what you do, and does not track which
+  apps you start.
 - Speech is not sent to the cloud, so voice typing (Win+H) may not work.
 - Windows does not learn from what you type and write, and sends none of it.
 - AI: Recall is off and any snapshots are deleted (Copilot+ PCs), no Click to
-  Do, and no AI image features in Paint.
+  Do, no AI agent in Settings, no AI in Paint or Notepad, and the Windows AI
+  service is switched off. Edge: no sidebar or Copilot, no AI writing or AI
+  history search, and no on-device AI model (deleted if it was downloaded).
 
 **Privacy, own PCs only** (`data\privacy-personal.psd1`, skipped on a work PC):
 
@@ -201,11 +241,12 @@ what it does and where it comes from.
 - **A setting without `(policy)`** is an ordinary preference, mostly a switch
   in Settings. You can flip it back there, but the next run sets it again. To
   keep it your way, wrap it in `<# ... #>` in the file -- that stops Setup
-  setting it, but does not undo it.
+  setting it, but does not undo it (`Setup.cmd -Restore` does, below).
 - **A `(policy)` setting** locks its switch: Settings greys it out and may say
   "Some of these settings are managed by your organization", and Edge says it
   is managed by your organization. That is expected. To undo one, delete its
-  value in regedit; the key is in the file.
+  value in regedit (the key is in the file), or undo everything with
+  `Setup.cmd -Restore`.
 - **When it shows**: taskbar and Explorer changes once Explorer restarts (Setup
   offers to), Start pins after signing out and in, policies and the new name
   after a restart.
@@ -218,6 +259,29 @@ Setup.cmd -WhatIf
 
 Shows everything it would install, remove and set, and changes nothing.
 
+## Undo: -Restore
+
+```
+Setup.cmd -Restore
+```
+
+Puts every setting Setup changed back the way it was before the first run:
+the tweaks, personal and privacy settings, the Start pins policy, the Windows
+AI service and the desktop background. Before Setup changes a setting, it
+writes the old value into that run's log; `-Restore` reads those lines back
+from `C:\WindowsInstallAutomation\logs`, newest run first, and asks once before
+changing anything. Each run is put back only once, so running it twice does
+nothing the second time. `Setup.cmd -Restore -WhatIf` shows what it would put
+back.
+
+Not put back: removed apps (reinstall them from the Microsoft Store),
+installed apps, the PC's name and the lock screen picture. Runs from before
+`-Restore` existed (November 2026) did not write down the old values, so there
+is nothing to put back for those. For all of it at once, there is System
+Restore and the restore point Setup makes at the start of every run.
+
+With the one-liner: `& ([scriptblock]::Create((irm https://roelie.cc/wia))) -Restore`
+
 ## What is where
 
 ```
@@ -227,7 +291,7 @@ Setup.ps1              		the whole run, top to bottom -- read this to see what h
 data\apps.psd1         		the apps you can pick
 data\remove.psd1       		what gets removed, every run (Xbox list only if you say so)
 data\tweaks.psd1       		general tweaks, sensible on any PC: no nags, no web search, Edge out of memory
-data\personal.psd1     		my own preferences: hidden files, no recent files, Start lists, verbose boot messages
+data\personal.psd1     		my own preferences: hidden files, no recent files, Start lists, blue screen details
 data\privacy-general.psd1   privacy on every PC: ads, typing and speech data, activity history, AI
 data\privacy-personal.psd1  privacy on my own PCs only: diagnostics, error reports, Office online
 data\start-pins.json   		your Start pins (exported with Export-StartLayout), applied with personal.psd1
@@ -278,7 +342,8 @@ sign-in.
 - **Removed Store apps can be reinstalled** from the Store at any time.
 - **Logs** go to `C:\WindowsInstallAutomation\logs`, one per run, wherever Setup
   ran from. The black background picture lives in that folder too, next to a
-  `README.txt` saying what the folder is. Delete the folder whenever you like.
+  `README.txt` saying what the folder is. Delete the folder whenever you like;
+  only `-Restore` needs the logs.
 - **Made for Windows 11 Pro and up.** Settings marked `(policy)` are Group
   Policies, which Windows Home ignores. On Home they are still written, and the
   summary may count them as changed, but they do nothing. That is expected.

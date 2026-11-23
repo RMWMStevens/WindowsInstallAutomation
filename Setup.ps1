@@ -7,7 +7,8 @@
     on its own, top to bottom:
       0. Restore point      always, before anything changes
       1. Remove apps        everything in data\remove.psd1 (+ Xbox if you said so;
-                            on a work PC the work apps stay)
+                            on a work PC the work apps stay), and the sponsored
+                            apps on the PC except the ones you keep
       2. Install apps       the ones you picked, then optionally update what is
                             left -- after the removals, so nothing is updated
                             only to be removed
@@ -16,24 +17,37 @@
       5. Privacy            data\privacy-general.psd1, plus privacy-personal.psd1
                             unless this is a work PC
       6. Extras             new PC name, black background
-      7. Summary            what changed and what failed; then read MANUAL.md
-    Steps 3 to 6 only run the parts you said yes to.
+      7. Clean-up           clears out old versions of Windows parts that updates
+                            replaced (DISM /StartComponentCleanup, no /ResetBase)
+      8. Summary            what changed and what failed; then read MANUAL.md
+    Steps 3 to 7 only run the parts you said yes to.
 
     Run it as often as you like. Every step checks first and only changes what
     is different, so a second run just removes whatever has come back.
+
+    Every setting it changes is written down in the log first, the way it was,
+    so -Restore can put it back.
 
 .PARAMETER Apps
     Skip the menu. Same input as the menu: all, none, group names, numbers or
     ranges -- e.g.  -Apps core,social   or   -Apps none
 
+.PARAMETER Restore
+    Instead of setting up: put back every registry setting earlier runs
+    changed, the way it was before the first run. Apps stay as they are.
+
 .EXAMPLE
     .\Setup.cmd -WhatIf
     Shows everything it would do and changes nothing.
+
+.EXAMPLE
+    .\Setup.cmd -Restore -WhatIf
+    Shows what -Restore would put back, and changes nothing.
 #>
 #Requires -Version 5.1
 #Requires -PSEdition Desktop
 [CmdletBinding(SupportsShouldProcess)]
-param([string[]]$Apps)
+param([string[]]$Apps, [switch]$Restore)
 
 . (Join-Path $PSScriptRoot 'tools\Helpers.ps1')
 
@@ -57,12 +71,40 @@ $personal   = (Import-PowerShellDataFile "$data\personal.psd1" -ErrorAction Stop
 $privacyAll = (Import-PowerShellDataFile "$data\privacy-general.psd1" -ErrorAction Stop).Privacy
 $privacyOwn = (Import-PowerShellDataFile "$data\privacy-personal.psd1" -ErrorAction Stop).Privacy
 
-Start-Log (Join-Path $script:WorkDir "logs\setup-$(Get-Date -Format 'yyyyMMdd-HHmmss').log")
+# A restore keeps its own log name: -Restore only reads the setup-* logs.
+$logName = if ($Restore) { 'restore' } else { 'setup' }
+Start-Log (Join-Path $script:WorkDir "logs\$logName-$(Get-Date -Format 'yyyyMMdd-HHmmss').log")
 Write-Host ''
-Write-Host '  Windows setup' -ForegroundColor Cyan
+Write-Host "  Windows setup$(if ($Restore) { ' -- restore' })" -ForegroundColor Cyan
 if ($WhatIfPreference) { Write-Host '  DRY RUN -- nothing will be changed' -ForegroundColor Yellow }
 if ([Environment]::OSVersion.Version.Build -lt 22000) {
     Write-Log 'This is Windows 10. Setup is written for Windows 11 -- it will run, but untested.' -Level Warn
+}
+
+
+# === -Restore: put back what earlier runs changed, then stop =================
+# Registry settings only. Removed apps come back from the Microsoft Store (or
+# all at once with the restore point); installed apps, the PC name and the
+# lock screen picture stay as they are.
+if ($Restore) {
+    Write-Log 'Put back settings' -Level Step
+    $changed = Restore-Settings
+    Show-Summary
+    if ($changed) {
+        Write-Host ''
+        if (Read-YesNo 'Restart Explorer now so the taskbar and Explorer changes show?' -Default $true) {
+            Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+            Write-Log 'Explorer restarted.' -Level Ok
+        }
+        Write-Host ''
+        Write-Host ' Restart the PC when you are done: policies and services only go back' -ForegroundColor Yellow
+        Write-Host ' to how they were after a restart.' -ForegroundColor Yellow
+    }
+    Write-Host ''
+    Write-Host ' Not put back: removed apps (reinstall them from the Microsoft Store), installed' -ForegroundColor Yellow
+    Write-Host " apps and the PC's name. To undo everything at once, use System Restore and the" -ForegroundColor Yellow
+    Write-Host " restore point 'Before WindowsInstallAutomation'." -ForegroundColor Yellow
+    exit ([int](@($script:Results | Where-Object Status -eq 'Failed').Count -gt 0))
 }
 
 
@@ -78,20 +120,54 @@ $chosen = @($chosen | Where-Object {
     })
 $chosen = @($chosen | Where-Object { -not $_.Ask }) + @($chosen | Where-Object { $_.Ask })
 
-Write-Host ''
-Write-Host '  A few questions. Each one defaults to the capital letter:' -ForegroundColor Cyan
-$newName     = if (Test-DefaultComputerName) { Read-NewComputerName }
+# The same answers as the last run on this PC, if you like: one Enter instead
+# of all the questions, and no chance of a different answer typed in a hurry --
+# say when running again after a restart, or after some updates.
+$last = Get-LastAnswers
+$same = $false
+if ($last) {
+    Write-Host ''
+    Write-Host "  Last time ($($last.Date.ToString('d MMM yyyy'))): $(Format-Answers $last)" -ForegroundColor Cyan
+    $same = Read-YesNo 'Same answers as last time? (n asks each question again)' -Default $true
+}
+
+# Sponsored apps (Candy Crush, TikTok...) that Windows or the PC maker put on
+# the PC go, except the ones you keep. Ones someone installed from the Store
+# stay. Only asked when there are any; with the same answers, the ones you kept
+# last time are kept again without asking.
+$found = @(Get-SponsoredApp -List $removeData.Sponsored)
+$sponsored = @($found | Where-Object Pushed)
+$keepSponsored = @(
+    if ($same) { $sponsored | Where-Object { $_.Name -in @($last.KeepSponsored) } }
+    elseif ($sponsored) { Read-SponsoredToKeep -Found $sponsored })
+
+# With the same answers, Read-Answer takes last time's answer instead of asking;
+# only a question added since then is asked. The word after $reuse is the name
+# its answer is saved under -- a new question also needs a line in Save-Answers
+# below, and a label in Format-Answers (tools\Helpers.ps1).
+$reuse = if ($same) { $last }
+if (-not $same) {
+    Write-Host ''
+    Write-Host '  A few questions. Each one defaults to the capital letter:' -ForegroundColor Cyan
+}
+# Never repeated: a new name (that was asked once), and the black background --
+# someone may have picked another one since.
+$newName     = if (-not $same -and (Test-DefaultComputerName)) { Read-NewComputerName }
 # A work PC keeps its work apps (Teams, OneDrive, Outlook...), skips the privacy
 # settings an employer may rely on, and leaves app updates to IT by default.
-$workPC      = Read-YesNo 'Is this a work PC, managed by your employer?'
-$doTweaks    = Read-YesNo 'Apply the general tweaks (data\tweaks.psd1)?' -Default $true
-$doPrivacy   = Read-YesNo 'Apply the privacy settings (data\privacy-*.psd1)?' -Default $true
-$updateAll   = Read-YesNo 'Update all installed apps afterwards (winget upgrade --all)?' -Default (-not $workPC)
-$removeXbox  = Read-YesNo 'Remove the Xbox apps too (keep them on a gaming PC)?'
-$doPersonal  = Read-YesNo 'Apply my personal preferences and Start pins (data\personal.psd1, data\start-pins.json)?'
-$blackScreen = Read-YesNo 'Plain black background on the desktop and the lock / sign-in screen?'
-Write-Log ("Answers: new name=$(if ($newName) { $newName } else { 'keep' }), work PC=$workPC, tweaks=$doTweaks, privacy=$doPrivacy, " +
-    "update all=$updateAll, remove Xbox=$removeXbox, personal + pins=$doPersonal, black background=$blackScreen")
+$workPC      = Read-Answer $reuse WorkPC 'Is this a work PC, managed by your employer?'
+$doTweaks    = Read-Answer $reuse Tweaks 'Apply the general tweaks (data\tweaks.psd1)?' -Default $true
+$doPrivacy   = Read-Answer $reuse Privacy 'Apply the privacy settings (data\privacy-*.psd1)?' -Default $true
+$updateAll   = Read-Answer $reuse UpdateAll 'Update all installed apps afterwards (winget upgrade --all)?' -Default (-not $workPC)
+$removeXbox  = Read-Answer $reuse RemoveXbox 'Remove the Xbox apps too (keep them on a gaming PC)?'
+$doPersonal  = Read-Answer $reuse Personal 'Apply my personal preferences and Start pins (data\personal.psd1, data\start-pins.json)?'
+$blackScreen = if ($same) { $false } else { Read-YesNo 'Plain black background on the desktop and the lock / sign-in screen?' }
+$doCleanup   = Read-Answer $reuse Cleanup 'At the end, clear out old Windows update files (DISM component clean-up, 10+ minutes)?'
+Save-Answers @{ WorkPC = $workPC; Tweaks = $doTweaks; Privacy = $doPrivacy; UpdateAll = $updateAll; RemoveXbox = $removeXbox
+    Personal = $doPersonal; Cleanup = $doCleanup; KeepSponsored = [string[]]@($keepSponsored | ForEach-Object { $_.Name }) }
+Write-Log ("Answers$(if ($same) { ' (same as last time)' }): new name=$(if ($newName) { $newName } else { 'keep' }), work PC=$workPC, " +
+    "tweaks=$doTweaks, privacy=$doPrivacy, update all=$updateAll, remove Xbox=$removeXbox, personal + pins=$doPersonal, " +
+    "black background=$blackScreen, clean-up=$doCleanup")
 
 
 # === 0. Restore point ========================================================
@@ -127,6 +203,22 @@ foreach ($r in $removeData.Remove) {
     if ($r.Feature)       { Disable-OptionalFeature -Feature $r.Feature -Name $r.Name }
     elseif ($r.Uninstall) { Remove-DesktopApp -DisplayName $r.Uninstall -Name $r.Name -StopProcess $r.StopProcess }
     else                  { Remove-StoreApp -Package $r.Package -Name $r.Name }
+}
+
+foreach ($s in $found) {
+    if (-not $s.Pushed) {
+        Write-Log "$($s.Name) -- kept, someone on this PC installed it" -Level Skip
+        Add-Result -Step 'remove' -Name $s.Name -Status Skipped -Detail 'installed by someone here'
+    }
+    elseif ($keepSponsored -contains $s) {
+        Write-Log "$($s.Name) -- kept, as you asked" -Level Skip
+        Add-Result -Step 'remove' -Name $s.Name -Status Skipped -Detail 'kept'
+    }
+    else { Remove-StoreApp -Package $s.Package -Name $s.Name }
+}
+if (-not $found) {
+    Write-Log 'Sponsored apps -- none on this PC' -Level Skip
+    Add-Result -Step 'remove' -Name 'Sponsored apps' -Status AlreadySet
 }
 
 if ($removeXbox) {
@@ -206,7 +298,14 @@ if ($blackScreen) { Set-BlackBackground }
 if (-not ($newName -or $blackScreen)) { Write-Log 'None -- no new name, no black background' -Level Skip }
 
 
-# === 7. Summary ==============================================================
+# === 7. Clean-up =============================================================
+# Last, because it takes longest: everything else is done before it starts.
+Write-Log 'Clean-up' -Level Step
+if ($doCleanup) { Invoke-ComponentCleanup }
+else { Write-Log 'Skipped -- you said no' -Level Skip }
+
+
+# === 8. Summary ==============================================================
 Show-Summary
 
 if ($restartExplorer) {

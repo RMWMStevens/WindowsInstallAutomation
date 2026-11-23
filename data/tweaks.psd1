@@ -10,7 +10,9 @@
     #   Data      what to set it to
     #   Type      DWord unless stated
     #   Explorer  $true = Explorer must restart before it shows (Setup offers to)
-    #   Why       what it is for -- in two years this is the only thing that
+    #   IfPresent $true = only where the key already exists (a service that
+    #             some Windows builds do not have); Setup never creates it
+    #   Why      what it is for -- in two years this is the only thing that
     #             tells you whether a setting that stopped working still matters
     #
     # Do NOT copy a key from a blog post. Change the setting by hand first, find
@@ -94,6 +96,10 @@
            Why  = 'Date & time > "Show time in the Notification Center".'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
            Value = 'ShowClockInNotificationCenter'; Data = 1; Explorer = $true }
+        @{ Name = 'Explorer: no OneDrive and Microsoft 365 ads'
+           Why  = '(unchecked) Folder Options > View: "Show sync provider notifications" off -- the banners in Explorer promoting OneDrive and Microsoft 365.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+           Value = 'ShowSyncProviderNotifications'; Data = 0; Explorer = $true }
         @{ Name = 'Alt+Tab shows windows only'
            Why  = 'Multitasking > "Show tabs from apps when snapping or pressing Alt+Tab": Don''t show tabs.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
@@ -143,6 +149,14 @@
            Why  = '(unchecked) Privacy > General > "Show me notifications in the Settings app" off.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\SystemSettings\AccountNotifications'
            Value = 'EnableAccountNotifications'; Data = 0 }
+        @{ Name = 'No phone suggestions'
+           Why  = '(unchecked) Bluetooth & devices > Mobile devices: "Show me suggestions for using my mobile device with Windows" off.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Mobility'
+           Value = 'OptedIn'; Data = 0 }
+        @{ Name = 'No Microsoft 365 ads in Settings'
+           Why  = '(policy) "Turn off cloud consumer account state content" (Experience/DisableConsumerAccountStateContent). Win11Debloat uses it against the Microsoft 365 and Copilot ads in Settings; Microsoft only says Windows then shows its default content instead. Education / Enterprise only.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
+           Value = 'DisableConsumerAccountStateContent'; Data = 1 }
         @{ Name = 'Settings opens without its Home page'
            Why  = '(policy) "Settings Page Visibility" = hide:home (Policy CSP Settings/PageVisibilityList). The Home page mostly shows recommendations and Microsoft 365 offers; Settings opens on System instead.'
            Key  = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer'
@@ -185,6 +199,58 @@
            Why  = '(policy) Edge BackgroundModeEnabled = 0: closing the last Edge window really closes Edge.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
            Value = 'BackgroundModeEnabled'; Data = 0 }
+
+        # --- Edge without ads and suggestions -----------------------------
+        # All documented Edge policies (learn.microsoft.com, Microsoft Edge
+        # browser policies). Edge's AI is switched off in privacy-general.psd1.
+        @{ Name = 'Edge: no news on the new tab page'
+           Why  = '(policy) NewTabPageContentEnabled = 0: no MSN news feed or sponsored content.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'NewTabPageContentEnabled'; Data = 0 }
+        @{ Name = 'Edge: no sponsored tiles on the new tab page'
+           Why  = '(policy) NewTabPageHideDefaultTopSites = 1: hides the default (sponsored) site tiles.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'NewTabPageHideDefaultTopSites'; Data = 1 }
+        @{ Name = 'Edge: no first-run screens'
+           Why  = '(policy) HideFirstRunExperience = 1.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'HideFirstRunExperience'; Data = 1 }
+        @{ Name = 'Edge: no "make Edge your default" prompts'
+           Why  = '(policy) DefaultBrowserSettingsCampaignEnabled = 0: no prompts to make Edge and Bing the defaults.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'DefaultBrowserSettingsCampaignEnabled'; Data = 0 }
+        @{ Name = 'Edge: no feature recommendations'
+           Why  = '(policy) ShowRecommendationsEnabled = 0: no "try this feature" pop-ups.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'ShowRecommendationsEnabled'; Data = 0 }
+        @{ Name = 'Edge: no tips and suggestions'
+           Why  = '(policy) SpotlightExperiencesAndRecommendationsEnabled = 0: no tips, suggestions or promoted backgrounds.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'SpotlightExperiencesAndRecommendationsEnabled'; Data = 0 }
+        @{ Name = 'Edge: no shopping assistant'
+           Why  = '(policy) EdgeShoppingAssistantEnabled = 0: no coupons, price comparisons or cashback pop-ups.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'EdgeShoppingAssistantEnabled'; Data = 0 }
+        @{ Name = 'Edge: no Microsoft Rewards'
+           Why  = '(policy) ShowMicrosoftRewards = 0.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'ShowMicrosoftRewards'; Data = 0 }
+        @{ Name = 'Edge: no Acrobat subscription button'
+           Why  = '(policy) ShowAcrobatSubscriptionButton = 0: the PDF viewer stops advertising Adobe Acrobat.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'ShowAcrobatSubscriptionButton'; Data = 0 }
+        @{ Name = 'Edge: no feedback requests'
+           Why  = '(policy) UserFeedbackAllowed = 0.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'UserFeedbackAllowed'; Data = 0 }
+        @{ Name = 'Edge: no tab grouping suggestions'
+           Why  = '(policy) TabServicesEnabled = 0: the titles and addresses of open tabs are not sent to Microsoft for grouping suggestions.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'TabServicesEnabled'; Data = 0 }
+        @{ Name = 'Edge: no "similar pages" on errors'
+           Why  = '(policy) AlternateErrorPagesEnabled = 0: a page that fails to load is not looked up at Microsoft.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'AlternateErrorPagesEnabled'; Data = 0 }
 
         # --- look -------------------------------------------------------
         @{ Name = 'Dark mode for apps'
@@ -230,6 +296,18 @@
            Why  = '(unchecked, not documented by Microsoft) The other half of the delay above; also read by explorer.exe on build 26300.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize'
            Value = 'WaitForIdleState'; Data = 0 }
+
+        # --- battery ----------------------------------------------------
+        @{ Name = 'Battery: no Wi-Fi while asleep'
+           Why  = '(policy) "Allow network connectivity during connected-standby (on battery)" disabled (ADMX_Power DCConnectivityInStandby_2): a sleeping laptop drops Wi-Fi instead of draining its battery on it. Mail, messages and updates then wait until it wakes. Plugged in nothing changes. Laptops with Modern Standby only; other PCs ignore it.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Power\PowerSettings\f15576e8-98b7-4186-b944-eafa664402d9'
+           Value = 'DCSettingIndex'; Data = 0 }
+
+        # --- Windows search without WebView2 ----------------------------
+        @{ Name = 'Search without WebView2'
+           Why  = '(not documented by Microsoft) A Windows feature switch, the kind ViVeTool flips (feature 1694661260 = disabled): Windows search stops drawing its results with Edge WebView2. Tested on my desktop, build 26300 (Nov 2026): after a restart, Search''s 6 WebView2 processes (214 MB) were gone and search worked as before. Search itself uses more now that it draws its results on its own (58 MB before; 117 MB after the restart, 197 MB a while later), so about 75 to 155 MB less in all. Takes a restart; a Windows update may undo it -- the next run puts it back.'
+           Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FeatureManagement\Overrides\8\1694661260'
+           Value = 'EnabledState'; Data = 1 }
 
         # --- system -----------------------------------------------------
         @{ Name = 'Clipboard history on'

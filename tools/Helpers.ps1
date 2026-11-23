@@ -9,7 +9,8 @@ $script:LogPath = $null
 
 # Setup's own folder on the PC, like AdwCleaner's C:\AdwCleaner: logs, and the
 # black background picture. Fixed and easy to find, whether Setup ran from a
-# clone or from the one-liner's temp folder. Safe to delete at any time.
+# clone or from the one-liner's temp folder. Safe to delete at any time; only
+# Setup.cmd -Restore needs the logs, to know what to put back.
 $script:WorkDir = Join-Path $env:SystemDrive 'WindowsInstallAutomation'
 
 # Load the Store-app and Windows-feature modules now, with -WhatIf switched off
@@ -50,10 +51,13 @@ Made by Roel Stevens -- https://roelstevens.dev
 
 What is in this folder:
 
-    logs\        one log file per run: what was changed, skipped or failed
+    logs\        one log file per run: what was changed, skipped or failed,
+                 and how each changed setting was before
     black.png    the black background picture, if you chose that option
 
-Nothing on this PC depends on this folder. You can delete it at any time.
+Nothing on this PC depends on this folder. You can delete it at any time,
+but "Setup.cmd -Restore" needs the logs to put settings back the way they
+were.
 '@
     }
 
@@ -120,6 +124,50 @@ function Read-YesNo {
     if ($answer -match '^[yY]') { return $true }
     if ($answer -match '^[nN]') { return $false }
     $Default
+}
+
+# Every real run writes its answers as an "Answers" line in its log, so the
+# next run on this PC can offer them again. Dry runs do not count.
+function Save-Answers {
+    param([Parameter(Mandatory)][hashtable]$Answers)
+    if ($WhatIfPreference -or -not $script:LogPath) { return }
+    "Answers`t$(ConvertTo-Json ([pscustomobject]$Answers) -Compress)" | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false
+}
+
+# The answers of the newest real run on this PC, with the day it ran.
+# Nothing when there is none.
+function Get-LastAnswers {
+    $logs = Get-ChildItem (Join-Path $script:WorkDir 'logs') -Filter 'setup-*.log' -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+    foreach ($log in $logs) {
+        $line = @(Get-Content $log.FullName -Encoding UTF8) -like "Answers`t*" | Select-Object -Last 1
+        if ($line) {
+            return $line.Substring(8) | ConvertFrom-Json | Add-Member -NotePropertyName Date -NotePropertyValue $log.LastWriteTime -PassThru
+        }
+    }
+}
+
+# One line with the answers, for "Same answers as last time?". Questions that
+# were not asked yet last time are left out.
+function Format-Answers {
+    param([Parameter(Mandatory)]$Answers)
+    $labels = [ordered]@{ WorkPC = 'work PC'; Tweaks = 'tweaks'; Privacy = 'privacy'; UpdateAll = 'update all'
+        RemoveXbox = 'remove Xbox'; Personal = 'personal + pins'; Cleanup = 'clean-up' }
+    $parts = @(foreach ($key in $labels.Keys) {
+            if ($null -ne $Answers.$key) { "$($labels[$key]) $(if ($Answers.$key) { 'yes' } else { 'no' })" }
+        })
+    $kept = @($Answers.KeepSponsored | Where-Object { $_ })
+    if ($kept) { $parts += "sponsored apps kept: $($kept -join ', ')" }
+    $parts -join ', '
+}
+
+# A yes/no question that "Same answers as last time?" can answer: with the
+# same answers ($Reuse = last time's), it takes last time's answer without
+# asking. A question that was not there last time -- one added to Setup later
+# -- is asked anyway, on its own, and remembered from then on.
+function Read-Answer {
+    param($Reuse, [Parameter(Mandatory)][string]$Key, [Parameter(Mandatory)][string]$Question, [bool]$Default = $false)
+    if ($Reuse -and $null -ne $Reuse.$Key) { return [bool]$Reuse.$Key }
+    Read-YesNo $Question -Default $Default
 }
 
 # Windows' own made-up names: DESKTOP-1A2B3C4, LAPTOP-1A2B3C4D, WIN-...
@@ -585,6 +633,40 @@ function Remove-StoreApp {
     }
 }
 
+# Which of the sponsored apps in remove.psd1 are on this PC, and who put them
+# there. Pushed = $true: the app is in Windows' copy for new users, so Windows
+# or the PC maker put it in and every new account gets it automatically --
+# those go. Pushed = $false: it is only installed for an account, so someone on
+# this PC got it from the Store (the sponsored tiles in Start are only shortcuts
+# that download the app when clicked) -- those stay. All apps are read in one
+# go: asking for each of the forty one by one takes a minute.
+function Get-SponsoredApp {
+    param([object[]]$List)
+    $admin = Test-IsAdmin
+    $all = @(Get-AppxPackage -AllUsers:$admin -ErrorAction SilentlyContinue)
+    $provisioned = @(Get-ProvisionedApp)
+    foreach ($s in $List) {
+        $pushed = [bool]($provisioned | Where-Object { $_.DisplayName -like $s.Package })
+        $hits = @($all | Where-Object { $_.Name -like $s.Package })
+        if ($admin) { $hits = @($hits | Where-Object { $_.PackageUserInformation | Where-Object { "$($_.InstallState)" -eq 'Installed' } }) }
+        if ($pushed -or $hits) { [pscustomobject]@{ Name = $s.Name; Package = $s.Package; Pushed = $pushed } }
+    }
+}
+
+# Shows the sponsored apps found and returns the ones you want to keep.
+# Just Enter keeps none.
+function Read-SponsoredToKeep {
+    param([Parameter(Mandatory)][object[]]$Found)
+    Write-Host ''
+    Write-Host '  Sponsored apps that came with this PC. They are removed, unless you keep them:' -ForegroundColor Cyan
+    for ($i = 0; $i -lt $Found.Count; $i++) { Write-Host ('    {0,2}  {1}' -f ($i + 1), $Found[$i].Name) }
+    try { $answer = Read-Host '  Numbers to keep (just Enter removes them all)' } catch { return }
+    foreach ($token in ("$answer" -split '[,\s]+' | Where-Object { $_ })) {
+        if ($token -match '^\d+$' -and [int]$token -ge 1 -and [int]$token -le $Found.Count) { $Found[[int]$token - 1] }
+        else { Write-Log "'$token' is not one of the numbers -- ignored" -Level Warn }
+    }
+}
+
 # Normal desktop programs, through their own uninstaller. MSI packages run
 # fully silent; anything else uses its quiet uninstall command if it has one.
 function Remove-DesktopApp {
@@ -680,6 +762,29 @@ function Disable-OptionalFeature {
 
 # === 3 to 5. Registry settings (tweaks, personal, privacy) ===================
 
+# Before Setup changes a registry value, it writes down how it was: an "Undo"
+# line in this run's log, with the old value and its type exactly (the
+# readable lines cut long values short). Setup.cmd -Restore reads them back.
+# Created = the first key on the way down that did not exist yet, so a
+# restore can remove the keys Setup made, not just the value.
+function Save-Undo {
+    param([Parameter(Mandatory)][string]$Key, [string]$Value = '', [Parameter(Mandatory)][string]$Label)
+    $undo = [ordered]@{ Label = $Label; Key = $Key; Value = $Value; Existed = $false; Data = $null; Type = $null; Created = $null }
+    $path = $Key
+    while (-not (Test-Path -LiteralPath $path)) { $undo.Created = $path; $path = Split-Path $path }
+    if (-not $undo.Created) {
+        $k = Get-Item -LiteralPath $Key
+        if ($k.GetValueNames() -contains $Value) {
+            $undo.Existed = $true
+            $undo.Data = $k.GetValue($Value, $null, 'DoNotExpandEnvironmentNames')
+            $undo.Type = "$($k.GetValueKind($Value))"
+        }
+    }
+    if ($script:LogPath) {
+        "Undo`t$(ConvertTo-Json ([pscustomobject]$undo) -Compress -Depth 3)" | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false
+    }
+}
+
 # Writes one registry value, only if it differs from what is there.
 # Returns $true when it changed something.
 function Set-RegValue {
@@ -714,6 +819,7 @@ function Set-RegValue {
             return
         }
 
+        Save-Undo -Key $Key -Value $Value -Label $Label
         if (-not (Test-Path -LiteralPath $Key)) { New-Item -Path $Key -Force -ErrorAction Stop | Out-Null }
         New-ItemProperty -LiteralPath $Key -Name $valueName -Value $Data -PropertyType $Type -Force -ErrorAction Stop | Out-Null
         Write-Log "$Label -- set $valueName=$shown (was $was)" -Level Ok
@@ -732,6 +838,13 @@ function Set-RegList {
     param([Parameter(Mandatory)][object[]]$Items, [Parameter(Mandatory)][string]$Step)
     $restart = $false
     foreach ($t in $Items) {
+        # IfPresent: only where the key exists already. Creating a key for a
+        # service this PC does not have would leave a broken service entry.
+        if ($t.IfPresent -and -not (Test-Path -LiteralPath $t.Key)) {
+            Write-Log "$($t.Name) -- not on this PC" -Level Skip
+            Add-Result -Step $Step -Name $t.Name -Status AlreadySet
+            continue
+        }
         $type = if ($t.Type) { $t.Type } else { 'DWord' }
         $changed = Set-RegValue -Key $t.Key -Value "$($t.Value)" -Data $t.Data -Type $type -Label $t.Name -Step $Step
         if ($changed -and $t.Explorer) { $restart = $true }
@@ -760,6 +873,25 @@ function Rename-ThisPC {
         Write-Log "$name -- $($_.Exception.Message)" -Level Fail
         Add-Result -Step 'extras' -Name $name -Status Failed -Detail $_.Exception.Message
     }
+}
+
+# The calls Settings itself makes: the desktop picture (empty = none) and the
+# desktop colour ("R G B", as in the registry). Both show straight away.
+function Set-DesktopPicture {
+    param([string]$Path, [string]$Colour)
+    if (-not ('WIA.Wallpaper' -as [type])) {
+        Add-Type -Namespace WIA -Name Wallpaper -MemberDefinition @'
+[DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+public static extern bool SystemParametersInfo(int action, int param, string value, int flags);
+[DllImport("user32.dll", SetLastError = true)]
+public static extern bool SetSysColors(int count, int[] elements, int[] colors);
+'@
+    }
+    if ($Colour -match '^\s*(\d+)\s+(\d+)\s+(\d+)\s*$') {
+        $rgb = [int]$Matches[1] + 256 * [int]$Matches[2] + 65536 * [int]$Matches[3]
+        $null = [WIA.Wallpaper]::SetSysColors(1, @(1), @($rgb))   # element 1 = the desktop colour
+    }
+    if (-not [WIA.Wallpaper]::SystemParametersInfo(0x14, 0, "$Path", 3)) { throw 'Windows refused the desktop background' }
 }
 
 # A plain black picture on the desktop and the lock screen. The sign-in screen
@@ -792,20 +924,16 @@ function Set-BlackBackground {
         $bmp.Save($file, [System.Drawing.Imaging.ImageFormat]::Png)
         $bmp.Dispose()
 
-        # Desktop: the call Settings itself makes. Shows straight away. Fit is
-        # set to "Fill" first and the desktop colour to black, so no screen
-        # shape or size can leave a coloured edge around the picture.
-        Set-ItemProperty 'HKCU:\Control Panel\Desktop' -Name WallpaperStyle -Value '10'
-        Set-ItemProperty 'HKCU:\Control Panel\Desktop' -Name TileWallpaper -Value '0'
+        # Desktop. Fit is set to "Fill" first and the desktop colour to black,
+        # so no screen shape or size can leave a coloured edge around the
+        # picture. What was there is written down for Setup.cmd -Restore.
+        $desktop = 'HKCU:\Control Panel\Desktop'
+        foreach ($v in 'WallpaperStyle', 'TileWallpaper', 'WallPaper') { Save-Undo -Key $desktop -Value $v -Label $name }
+        Save-Undo -Key 'HKCU:\Control Panel\Colors' -Value 'Background' -Label $name
+        Set-ItemProperty $desktop -Name WallpaperStyle -Value '10'
+        Set-ItemProperty $desktop -Name TileWallpaper -Value '0'
         Set-ItemProperty 'HKCU:\Control Panel\Colors' -Name Background -Value '0 0 0'
-        Add-Type -Namespace WIA -Name Wallpaper -MemberDefinition @'
-[DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-public static extern bool SystemParametersInfo(int action, int param, string value, int flags);
-[DllImport("user32.dll", SetLastError = true)]
-public static extern bool SetSysColors(int count, int[] elements, int[] colors);
-'@
-        $null = [WIA.Wallpaper]::SetSysColors(1, @(1), @(0))   # desktop colour (1) = black, right away
-        if (-not [WIA.Wallpaper]::SystemParametersInfo(0x14, 0, $file, 3)) { throw 'Windows refused the desktop background' }
+        Set-DesktopPicture -Path $file -Colour '0 0 0'
 
         # Lock screen: Windows' own lock screen API, the one apps use.
         Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -827,4 +955,182 @@ public static extern bool SetSysColors(int count, int[] elements, int[] colors);
         Write-Log "$name -- $msg" -Level Fail
         Add-Result -Step 'extras' -Name $name -Status Failed -Detail $msg
     }
+}
+
+
+# === 7. Clean-up =============================================================
+
+# Windows keeps the old version of every part of itself that an update
+# replaces, in C:\Windows\WinSxS. It clears out the ones it no longer needs on
+# its own, about once a month and only after 30 days (the StartComponentCleanup
+# scheduled task). This does the same straight away -- worth it right after a
+# fresh install has pulled in a pile of updates. Installed updates can still be
+# uninstalled afterwards; /ResetBase would take that away, so it is NOT used.
+function Invoke-ComponentCleanup {
+    $name = 'Clean up old update files'
+    if ($WhatIfPreference) {
+        Write-Log "$name -- would run DISM /Online /Cleanup-Image /StartComponentCleanup"
+        Add-Result -Step 'cleanup' -Name $name -Status Skipped -Detail 'WhatIf'
+        return
+    }
+    # DISM refuses while Windows waits for a restart to finish installing or
+    # removing something -- an update, or Recall removed earlier in this run.
+    if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') {
+        Write-Log "$name -- skipped, Windows is waiting for a restart. Restart, run Setup again and say yes to the clean-up." -Level Skip
+        Add-Result -Step 'cleanup' -Name $name -Status Skipped -Detail 'restart pending'
+        return
+    }
+
+    $drive = $env:SystemDrive.TrimEnd(':')
+    $freeBefore = (Get-PSDrive $drive).Free
+    Write-Log "$name -- running DISM, this can take 10 minutes or more..."
+    # In this same window, so DISM's own progress bar shows. What DISM did is
+    # in its own log, not Setup's.
+    $p = Start-Process dism.exe -ArgumentList '/Online /Cleanup-Image /StartComponentCleanup' -NoNewWindow -Wait -PassThru
+    $freed = [math]::Round(((Get-PSDrive $drive).Free - $freeBefore) / 1GB, 1)
+
+    if ($p.ExitCode -in 0, 3010) {
+        if ($freed -ge 0.1) {
+            Write-Log "$name -- done, about $freed GB freed" -Level Ok
+            Add-Result -Step 'cleanup' -Name $name -Status Changed -Detail "about $freed GB freed"
+        }
+        else {
+            Write-Log "$name -- done, there was nothing to clear" -Level Skip
+            Add-Result -Step 'cleanup' -Name $name -Status AlreadySet
+        }
+    }
+    else {
+        $log = "$env:windir\Logs\DISM\dism.log"
+        Write-Log "$name -- DISM exit $($p.ExitCode). Its log: $log" -Level Fail
+        Add-Result -Step 'cleanup' -Name $name -Status Failed -Detail "DISM exit $($p.ExitCode) -- see $log"
+    }
+}
+
+
+# === Setup.cmd -Restore ======================================================
+
+# Puts one registry value back the way an Undo line recorded it, and removes
+# the keys Setup created for it once they are empty again. Returns $true when
+# it changed something.
+function Restore-RegValue {
+    param([Parameter(Mandatory)]$Undo)
+    $name = "$($Undo.Value)"
+    $valueName = if ($name) { $name } else { '(default)' }
+    try {
+        $key = if (Test-Path -LiteralPath $Undo.Key) { Get-Item -LiteralPath $Undo.Key }
+        $isSet = $key -and ($key.GetValueNames() -contains $name)
+        if ($Undo.Existed) {
+            $now = if ($isSet) { $key.GetValue($name, $null, 'DoNotExpandEnvironmentNames') }
+            $same = $isSet -and (ConvertTo-Json @($now) -Compress) -eq (ConvertTo-Json @($Undo.Data) -Compress)
+            $shown = if ("$($Undo.Data)".Length -gt 50) { "$("$($Undo.Data)".Substring(0, 47))..." } else { "'$($Undo.Data)'" }
+            $would, $done = "put $valueName back to $shown", "$valueName put back to $shown"
+        }
+        else {
+            $same = -not $isSet
+            $would, $done = "remove $valueName, it was not set before", "$valueName removed, it was not set before"
+        }
+
+        if ($same) {
+            Write-Log "$($Undo.Label) -- $valueName is already as it was" -Level Skip
+            Add-Result -Step 'restore' -Name $Undo.Label -Status AlreadySet
+            return
+        }
+        if ($WhatIfPreference) {
+            Write-Log "$($Undo.Label) -- would $would"
+            Add-Result -Step 'restore' -Name $Undo.Label -Status Skipped -Detail 'WhatIf'
+            return
+        }
+
+        if ($Undo.Existed) {
+            $data = switch ($Undo.Type) {
+                'DWord'       { [int]$Undo.Data }
+                'QWord'       { [long]$Undo.Data }
+                'Binary'      { [byte[]]@($Undo.Data) }
+                'MultiString' { [string[]]@($Undo.Data) }
+                default       { [string]$Undo.Data }
+            }
+            if (-not $key) { New-Item -Path $Undo.Key -Force -ErrorAction Stop | Out-Null }
+            New-ItemProperty -LiteralPath $Undo.Key -Name $valueName -Value $data -PropertyType $Undo.Type -Force -ErrorAction Stop | Out-Null
+        }
+        else {
+            # Through .NET: PowerShell cannot delete a key's (default) value.
+            $hive, $subKey = $key.Name -split '\\', 2
+            $root = if ($hive -eq 'HKEY_LOCAL_MACHINE') { [Microsoft.Win32.Registry]::LocalMachine } else { [Microsoft.Win32.Registry]::CurrentUser }
+            $writable = $root.OpenSubKey($subKey, $true)
+            try { $writable.DeleteValue($name) } finally { $writable.Close() }
+            # Some keys work by just being there (the F1 one does), so the
+            # keys Setup created go as well -- once nothing else is in them.
+            if ($Undo.Created) {
+                $path = $Undo.Key
+                while (Test-Path -LiteralPath $path) {
+                    $k = Get-Item -LiteralPath $path
+                    if ($k.ValueCount -or $k.SubKeyCount) { break }
+                    Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+                    if ($path -eq $Undo.Created) { break }
+                    $path = Split-Path $path
+                }
+            }
+        }
+        Write-Log "$($Undo.Label) -- $done" -Level Ok
+        Add-Result -Step 'restore' -Name $Undo.Label -Status Changed
+        $true
+    }
+    catch {
+        Write-Log "$($Undo.Label) -- $($_.Exception.Message)" -Level Fail
+        Add-Result -Step 'restore' -Name $Undo.Label -Status Failed -Detail $_.Exception.Message
+    }
+}
+
+# Puts back every registry value that earlier runs changed: the newest run
+# first, and within a run the last change first, so everything ends up as it
+# was before the first run. The runs come from the Undo lines in the logs in
+# C:\WindowsInstallAutomation\logs. Each log then gets a "Restored" line, so
+# it is never put back twice. Returns $true when something changed.
+function Restore-Settings {
+    $logs = Get-ChildItem (Join-Path $script:WorkDir 'logs') -Filter 'setup-*.log' -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+    $runs = @(foreach ($log in $logs) {
+            $lines = @(Get-Content $log.FullName -Encoding UTF8)
+            if ($lines -match '^Restored\t') { continue }
+            $undo = @($lines -like "Undo`t*" | ForEach-Object { $_.Substring(5) | ConvertFrom-Json })
+            if ($undo) { [pscustomobject]@{ Log = $log; Undo = $undo } }
+        })
+    if (-not $runs) {
+        Write-Log ('Nothing to put back: no run of Setup has changed a setting on this PC since the last restore. ' +
+            'Runs from before Setup had -Restore did not write down the old values; for those, use the restore point.') -Level Skip
+        return $false
+    }
+
+    $total = 0
+    foreach ($run in $runs) {
+        Write-Log "Run of $($run.Log.LastWriteTime.ToString('d MMM yyyy HH:mm')): $($run.Undo.Count) setting(s)"
+        $total += $run.Undo.Count
+    }
+    if (-not $WhatIfPreference -and -not (Read-YesNo "Put these $total setting(s) back the way they were?")) {
+        Write-Log 'Nothing put back -- you said no' -Level Skip
+        return $false
+    }
+
+    $changed = $false
+    $wallpaper = $false
+    foreach ($run in $runs) {
+        for ($i = $run.Undo.Count - 1; $i -ge 0; $i--) {
+            $u = $run.Undo[$i]
+            if (Restore-RegValue $u) {
+                $changed = $true
+                if ($u.Key -eq 'HKCU:\Control Panel\Desktop' -and $u.Value -eq 'WallPaper') { $wallpaper = $true }
+            }
+        }
+        if (-not $WhatIfPreference) { "Restored`t$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Add-Content $run.Log.FullName -Encoding UTF8 }
+    }
+
+    # The old desktop picture is back in the registry; this shows it now.
+    if ($wallpaper) {
+        try {
+            Set-DesktopPicture -Path (Get-ItemProperty 'HKCU:\Control Panel\Desktop').WallPaper `
+                -Colour (Get-ItemProperty 'HKCU:\Control Panel\Colors').Background
+        }
+        catch { Write-Log "Desktop picture -- $($_.Exception.Message). It shows after signing out and in." -Level Warn }
+        Write-Log 'The lock screen picture stays black: pick another in Settings > Personalization > Lock screen.' -Level Warn
+    }
+    $changed
 }
