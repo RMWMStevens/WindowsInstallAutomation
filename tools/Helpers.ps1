@@ -475,8 +475,10 @@ function Get-WingetUpdates {
 #   Microsoft 365     by itself. winget's package would reinstall OneDrive and Teams.
 #   Windows Terminal  by the Store. Setup runs inside it; an update closes the window.
 #   App Installer     by the Store. It is winget itself; updating it mid-run breaks winget.
+#   Visual Studio     by the Visual Studio Installer. Through winget it often fails.
 # Node.js gets a pin on its major version. To move on: winget pin remove OpenJS.NodeJS.LTS
-$script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20HK701', 'Microsoft.AppInstaller', '9NBLGGH4NNS1')
+$script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20HK701', 'Microsoft.AppInstaller', '9NBLGGH4NNS1',
+    'Microsoft.VisualStudio.Community')
 
 function Update-AllApps {
     $name = 'Update all apps'
@@ -490,22 +492,38 @@ function Update-AllApps {
         $null = & winget pin add --id OpenJS.NodeJS.LTS --exact --version "$($Matches[1]).*" --force --accept-source-agreements --disable-interactivity 2>&1
     }
 
-    # One line per app on screen, all of winget's output in the log.
+    # One line per app on screen, all of winget's output in the log. $tried
+    # keeps winget's last result line per app it tried.
     Write-Log "${name}: updating, this can take a while..."
+    $tried, $id = @{}, $null
     & winget upgrade --all --silent --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | ForEach-Object {
         $line = ("$_" -split "`r")[-1]
         if ($script:LogPath) { Add-Content $script:LogPath $line -Encoding UTF8 -WhatIf:$false }
-        if ($line -match '^\((\d+)/(\d+)\)\s+\S+\s+(.+?)\s+\[') { Write-Host "    ($($Matches[1])/$($Matches[2])) $($Matches[3])" -ForegroundColor Gray }
+        if ($line -match '^\((\d+)/(\d+)\)\s+\S+\s+(.+?)\s+\[(.+?)\]') {
+            $id = $Matches[4]
+            $tried[$id] = ''
+            Write-Host "    ($($Matches[1])/$($Matches[2])) $($Matches[3])" -ForegroundColor Gray
+        }
+        elseif ($id -and $line -match 'Successfully installed|exit code') { $tried[$id] = $line }
     }
     $exit = $LASTEXITCODE
 
-    # What winget still offers was not updated: the app was open, or needs a fresh install.
-    $left = @(Get-WingetUpdates)
-    if ($left) {
-        Add-Result apps $name Failed ("not updated: $($left.Name -join ', '). Often the app was open: close it and run Setup again. " +
-            'Otherwise the new version needs a fresh install: uninstall the app, then install it again.')
+    # Still offered means not updated. Apps winget did not even try need a fresh
+    # install. One that just installed fine can still show the old version for
+    # a moment; that is no failure.
+    $left = @(Get-WingetUpdates | Where-Object { $tried[$_.Id] -notmatch 'Successfully installed' })
+    foreach ($app in $left) {
+        if (-not $tried.ContainsKey($app.Id)) { Add-Result apps $app.Name Failed 'not updated, the new version needs a fresh install: uninstall the app, then install it again.' }
+        else {
+            $code = if ($tried[$app.Id] -match 'exit code:?\s*(-?\d+)') { " (exit $($Matches[1]))" }
+            Add-Result apps $app.Name Failed "not updated, the installer failed$code. Often the app was open: close it and run Setup again."
+        }
     }
-    elseif ($exit -notin 0, -1978335189, -1978335212) { Add-Result apps $name Failed "winget exit $exit (see the log)" }
+    if ($left) {
+        if ($before.Count -gt $left.Count) { Add-Result apps $name Changed "$($before.Count - $left.Count) of $($before.Count) app(s) updated" }
+        return
+    }
+    if ($exit -notin 0, -1978335189, -1978335212) { Add-Result apps $name Failed "winget exit $exit (see the log)" }
     else { Add-Result apps $name Changed 'done' }
 }
 

@@ -143,8 +143,9 @@ scheduled tasks, the firewall, antivirus settings and activation.
 - **Privacy: yes** (default) applies `data\privacy-general.psd1`, and on your
   own PCs `data\privacy-personal.psd1` too.
 - **Update all: yes** runs `winget upgrade --all` after the installs.
-  Microsoft 365, Windows Terminal and App Installer are skipped because they
-  update themselves, and Node.js stays on its current major version.
+  Microsoft 365, Windows Terminal, App Installer and Visual Studio are skipped
+  because they update themselves, and Node.js stays on its current major
+  version.
 - **Xbox: yes** also removes the eight Xbox parts at the bottom of
   `data\remove.psd1`. Games that sign in with Xbox need them.
 - **Personal: yes** applies `data\personal.psd1`.
