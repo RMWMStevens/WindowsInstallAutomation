@@ -90,9 +90,10 @@ if ($last) {
     $same = Read-YesNo 'Same answers as last time? (n asks each question again)' -Default $true
 }
 
-# Sponsored apps that came with the PC go, except the ones you keep.
+# Sponsored apps that came with the PC go, except the ones you keep or picked
+# to install.
 $found = @(Get-SponsoredApp -List $removeData.Sponsored)
-$sponsored = @($found | Where-Object Pushed)
+$sponsored = @($found | Where-Object { $_.Pushed -and $_.Name -notin $chosen.Name })
 $keepSponsored = @(
     if ($same) { $sponsored | Where-Object { $_.Name -in @($last.KeepSponsored) } }
     elseif ($sponsored) { Read-SponsoredToKeep -Found $sponsored })
@@ -147,6 +148,7 @@ foreach ($r in $removeData.Remove) {
 
 foreach ($s in $found) {
     if (-not $s.Pushed) { Add-Result remove $s.Name Skipped 'kept, someone on this PC installed it' }
+    elseif ($s.Name -in $chosen.Name) { Add-Result remove $s.Name Skipped 'kept, you picked it to install' }
     elseif ($keepSponsored -contains $s) { Add-Result remove $s.Name Skipped 'kept, as you asked' }
     else { Remove-StoreApp -Package $s.Package -Name $s.Name }
 }

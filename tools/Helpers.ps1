@@ -3,8 +3,9 @@
 
 $script:Results = [System.Collections.Generic.List[object]]::new()
 $script:LogPath = $null
-$script:WorkDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsInstallAutomation'   # logs and black.png
+$script:DocsDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsInstallAutomation'
 $script:SpareDir = Join-Path $env:SystemDrive 'WindowsInstallAutomation'   # when Documents is blocked
+$script:WorkDir = $script:DocsDir   # logs and black.png; Start-Log picks one of the two
 
 # Loaded with -WhatIf off: under -WhatIf they print a screen of "What if" lines.
 $whatIf = $global:WhatIfPreference
@@ -25,7 +26,7 @@ function Start-Log {
     $os = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
     $header = "=== $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  Windows $($os.DisplayVersion) build $($os.CurrentBuild) $($os.EditionID) ==="
     $problem = $null
-    foreach ($dir in $script:WorkDir, $script:SpareDir) {
+    foreach ($dir in $script:DocsDir, $script:SpareDir) {
         try {
             New-Item -ItemType Directory -Path "$dir\logs" -Force -WhatIf:$false -ErrorAction Stop | Out-Null
             $header | Set-Content "$dir\logs\$Name" -Encoding UTF8 -WhatIf:$false -ErrorAction Stop
@@ -133,7 +134,7 @@ function Read-LogData {
 
 # Logs of earlier runs on this PC, newest first.
 function Get-SetupLog {
-    Get-ChildItem "$script:WorkDir\logs", "$script:SpareDir\logs" -Filter 'setup-*.log' -ErrorAction SilentlyContinue | Sort-Object Name -Descending -Unique
+    Get-ChildItem "$script:DocsDir\logs", "$script:SpareDir\logs" -Filter 'setup-*.log' -ErrorAction SilentlyContinue | Sort-Object Name -Descending -Unique
 }
 
 # The answers of the newest real run (not a dry run), with its date.
@@ -242,7 +243,8 @@ $script:ProtectedPackages = @(
 $script:XboxPackages = @('Microsoft.Xbox*', 'Microsoft.GamingApp', 'Microsoft.GamingServices', 'Microsoft.Edge.GameAssist')
 
 # Windows' copy of an app that every new account gets ("provisioned"). Read
-# once per run, it is slow. Needs admin, so empty in a dry run without it.
+# once per run, it is slow; Remove-StoreApp keeps it current. Needs admin, so
+# empty in a dry run without it.
 function Get-ProvisionedApp {
     if (-not (Test-IsAdmin)) { return }
     if ($null -eq $script:Provisioned) { $script:Provisioned = @(Get-AppxProvisionedPackage -Online) }
@@ -274,7 +276,10 @@ function Remove-StoreApp {
     if ($WhatIfPreference) { return Add-Result remove $Name WhatIf "would remove ($what)" }
     try {
         # Windows' copy first, so a feature update does not bring it back.
-        if ($provisioned) { $provisioned | Remove-AppxProvisionedPackage -Online -ErrorAction Stop | Out-Null }
+        if ($provisioned) {
+            $provisioned | Remove-AppxProvisionedPackage -Online -ErrorAction Stop | Out-Null
+            $script:Provisioned = @($script:Provisioned | Where-Object { $_.PackageName -notin $provisioned.PackageName })
+        }
         if ($installed) { $installed | Remove-AppxPackage -AllUsers -ErrorAction Stop }
         Add-Result remove $Name Changed "removed ($what)"
     }
@@ -452,8 +457,11 @@ function Install-WingetApp {
 }
 
 # What winget would update: Name, Id, Version. Read by column position, so it
-# works in any Windows language. Pinned apps are not listed.
+# works in any Windows language. Pinned apps are not listed. In a narrow window
+# winget cuts long IDs short with an ellipsis; such an ID becomes the one in
+# $Known that starts the same.
 function Get-WingetUpdates {
+    param([string[]]$Known)
     $lines = @(& winget upgrade --accept-source-agreements --disable-interactivity 2>$null | ForEach-Object { ("$_" -split "`r")[-1] })
     $dashes = [array]::FindIndex([string[]]$lines, [Predicate[string]] { param($l) $l -match '^-{20,}$' })
     if ($dashes -lt 1) { return }
@@ -463,9 +471,15 @@ function Get-WingetUpdates {
     foreach ($row in $lines[($dashes + 1)..($lines.Count - 1)]) {
         # Rows end in one word at the Source column; the text under the table does not.
         if ($row.Length -le $sourceAt -or $row.Substring($sourceAt).Trim() -match '\s') { break }
+        $id = $row.Substring($idAt).Trim().Split(' ')[0]
+        if ($id.EndsWith([char]0x2026)) {
+            $start = $id.Substring(0, $id.Length - 1)
+            $hits = @($Known | Where-Object { $_.StartsWith($start, [StringComparison]::OrdinalIgnoreCase) })
+            if ($hits.Count -eq 1) { $id = $hits[0] }
+        }
         [pscustomobject]@{
             Name    = $row.Substring(0, $idAt).Trim()
-            Id      = $row.Substring($idAt).Trim().Split(' ')[0]
+            Id      = $id
             Version = $row.Substring($versionAt).Trim().Split(' ')[0]
         }
     }
@@ -482,7 +496,7 @@ $script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20
 
 function Update-AllApps {
     $name = 'Update all apps'
-    $before = @(Get-WingetUpdates | Where-Object { $_.Id -notin $script:LeaveAlone })
+    $before = @(Get-WingetUpdates -Known $script:LeaveAlone | Where-Object { $_.Id -notin $script:LeaveAlone })
     if (-not $before) { return Add-Result apps $name AlreadySet 'everything is up to date' }
     if ($WhatIfPreference) { return Add-Result apps $name WhatIf "would update $($before.Count) app(s): $($before.Name -join ', ')" }
 
@@ -511,7 +525,7 @@ function Update-AllApps {
     # Still offered means not updated. Apps winget did not even try need a fresh
     # install. One that just installed fine can still show the old version for
     # a moment; that is no failure.
-    $left = @(Get-WingetUpdates | Where-Object { $tried[$_.Id] -notmatch 'Successfully installed' })
+    $left = @(Get-WingetUpdates -Known $tried.Keys | Where-Object { $tried[$_.Id] -notmatch 'Successfully installed' })
     foreach ($app in $left) {
         if (-not $tried.ContainsKey($app.Id)) { Add-Result apps $app.Name Failed 'not updated, the new version needs a fresh install: uninstall the app, then install it again.' }
         else {
@@ -807,7 +821,8 @@ function Restore-Settings {
                 if ($u.Value -eq 'WallPaper') { $wallpaper = $true }
             }
         }
-        if (-not $WhatIfPreference) { "Restored`t$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Add-Content $run.Log.FullName -Encoding UTF8 }
+        # Can fail when Documents is blocked; harmless, its values are back.
+        if (-not $WhatIfPreference) { "Restored`t$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Add-Content $run.Log.FullName -Encoding UTF8 -ErrorAction SilentlyContinue }
     }
     if ($wallpaper) {
         try { Set-DesktopPicture (Get-ItemProperty 'HKCU:\Control Panel\Desktop').WallPaper (Get-ItemProperty 'HKCU:\Control Panel\Colors').Background }
