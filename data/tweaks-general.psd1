@@ -1,28 +1,36 @@
 @{
-    # General tweaks, fine on any PC. One block per registry value:
+    # General tweaks against ads, nags and clutter, and a few speed-ups, fine on
+    # any PC. Taste (the taskbar, dark mode, typing) is in tweaks-personal.psd1. One
+    # block per registry value:
     #   Key        HKCU: this account, HKLM: the whole PC
     #   Value      value name; leave it out for the key's (default) value
     #   Data       what to set it to
     #   Type       DWord unless stated
     #   Explorer   $true: shows after Explorer restarts
     #   IfPresent  $true: only where the key already exists
-    #   Why        what it does and where it comes from. (policy): documented by
-    #              Microsoft, Pro and up. (unchecked): not confirmed on my own PC
-    #              yet. No mark: captured on my own PC.
+    #   IfData     only change it from this value (Windows' default), so a
+    #              setting someone chose stays
+    #   TaskbarAutoHide  $true: "Automatically hide the taskbar", set the way
+    #              Settings does it; no Key, Value or Data
+    #   Why        what it does and where it comes from, where the name is not
+    #              enough. (policy): documented by Microsoft; Windows Home ignores
+    #              some. (unchecked): not confirmed on my own PC yet. (not
+    #              documented): works, but Microsoft does not describe it. No
+    #              mark: captured on my own PC.
     # Wrap a block in <# #> to stop setting it; that does not undo it.
-    # personal.psd1 and the privacy files use the same format.
+    # tweaks-personal.psd1 and the privacy files use the same format.
     Tweaks = @(
 
         # --- F1 ---
         @{ Name = 'F1 opens nothing (64-bit apps)'
-           Why  = 'F1 no longer opens "Get help" in the browser.'
+           Why  = '(not documented) F1 no longer opens "Get help" in the browser.'
            Key  = 'HKCU:\Software\Classes\TypeLib\{8cec5860-07a1-11d9-b15e-000d56bfe6ee}\1.0\0\win64'
            Data = ''; Type = 'String' }
         @{ Name = 'F1 opens nothing (32-bit apps)'
            Key  = 'HKCU:\Software\Classes\TypeLib\{8cec5860-07a1-11d9-b15e-000d56bfe6ee}\1.0\0\win32'
            Data = ''; Type = 'String' }
 
-        # --- search only searches this PC ---
+        # --- no Bing or web results in search ---
         @{ Name = 'No web suggestions in the search box'
            Why  = 'Windows search finds things on this PC only, no Bing results.'
            Key  = 'HKCU:\Software\Policies\Microsoft\Windows\Explorer'
@@ -38,10 +46,6 @@
         @{ Name = 'No search highlights'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\SearchSettings'
            Value = 'IsDynamicSearchBoxEnabled'; Data = 0 }
-        @{ Name = 'Search without WebView2'
-           Why  = '(not documented by Microsoft) Feature override 1694661260 off: search draws its results without Edge WebView2, about 75 to 150 MB less. Takes a restart; an update may undo it.'
-           Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FeatureManagement\Overrides\8\1694661260'
-           Value = 'EnabledState'; Data = 1 }
 
         # --- Explorer and taskbar ---
         <#
@@ -50,37 +54,14 @@
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
            Value = 'HideFileExt'; Data = 0; Explorer = $true }
         #>
-        @{ Name = 'Explorer opens on This PC'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-           Value = 'LaunchTo'; Data = 1; Explorer = $true }
-        @{ Name = 'Copy dialog shows details'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\OperationStatusManager'
-           Value = 'EnthusiastMode'; Data = 1 }
-        @{ Name = 'Taskbar icons on the left'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-           Value = 'TaskbarAl'; Data = 0; Explorer = $true }
         @{ Name = 'Hide the chat button'
            Why  = 'Windows 11 21H2 and 22H2 only; ignored elsewhere.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
            Value = 'TaskbarMn'; Data = 0; Explorer = $true }
-        @{ Name = 'Hide the task view button'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-           Value = 'ShowTaskViewButton'; Data = 0; Explorer = $true }
-        @{ Name = 'Hide search on the taskbar'
-           Why  = 'Typing in Start still searches.'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
-           Value = 'SearchboxTaskbarMode'; Data = 0; Explorer = $true }
-        @{ Name = 'Clock in the notification center'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-           Value = 'ShowClockInNotificationCenter'; Data = 1; Explorer = $true }
         @{ Name = 'Explorer: no OneDrive and Microsoft 365 ads'
            Why  = '(unchecked) Folder Options > View: "Show sync provider notifications" off.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
            Value = 'ShowSyncProviderNotifications'; Data = 0; Explorer = $true }
-        @{ Name = 'Alt+Tab shows windows only'
-           Why  = 'No browser tabs in Alt+Tab.'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-           Value = 'MultiTaskingAltTabFilter'; Data = 3 }
 
         # --- no tips, ads or nags ---
         @{ Name = 'Start: no tips, shortcuts or new-app recommendations'
@@ -156,7 +137,7 @@
 
         # --- Edge: no memory use when closed, no ads (Edge policies) ---
         @{ Name = 'Edge: no startup boost'
-           Why  = '(policy) Edge no longer starts at sign-in or in the background.'
+           Why  = '(policy) Edge no longer starts at sign-in.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
            Value = 'StartupBoostEnabled'; Data = 0 }
         @{ Name = 'Edge: nothing running after closing'
@@ -212,62 +193,47 @@
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
            Value = 'AlternateErrorPagesEnabled'; Data = 0 }
 
-        # --- look ---
-        @{ Name = 'Dark mode for apps'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-           Value = 'AppsUseLightTheme'; Data = 0; Explorer = $true }
-        @{ Name = 'Dark mode for Windows'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
-           Value = 'SystemUsesLightTheme'; Data = 0; Explorer = $true }
-
-        # --- keyboard and typing ---
+        # --- keyboard ---
         @{ Name = 'No Sticky Keys shortcut'
-           Why  = 'Pressing Shift five times no longer asks to turn on Sticky Keys.'
+           Why  = 'Pressing Shift five times no longer asks to turn on Sticky Keys. Only changed from Windows'' default (510), so someone who uses Sticky Keys keeps them.'
            Key  = 'HKCU:\Control Panel\Accessibility\StickyKeys'
-           Value = 'Flags'; Data = '506'; Type = 'String' }
+           Value = 'Flags'; Data = '506'; Type = 'String'; IfData = '510' }
         @{ Name = 'No Filter Keys shortcut'
-           Why  = 'Holding right Shift no longer turns on Filter Keys.'
+           Why  = 'Holding right Shift no longer turns on Filter Keys. Only changed from Windows'' default (126).'
            Key  = 'HKCU:\Control Panel\Accessibility\Keyboard Response'
-           Value = 'Flags'; Data = '26'; Type = 'String' }
-        @{ Name = 'No autocorrect'
-           Key  = 'HKCU:\Control Panel\International\User Profile'
-           Value = 'ShowAutoCorrection'; Data = 0 }
-        @{ Name = 'No text suggestions'
-           Key  = 'HKCU:\Control Panel\International\User Profile'
-           Value = 'ShowTextPrediction'; Data = 0 }
-        @{ Name = 'No autocorrect on the touch keyboard'
-           Key  = 'HKCU:\Software\Microsoft\TabletTip\1.7'
-           Value = 'EnableAutocorrection'; Data = 0 }
+           Value = 'Flags'; Data = '26'; Type = 'String'; IfData = '126' }
 
-        # --- startup apps start straight away, not 10 seconds after sign-in ---
+        # --- speed-ups ---
         @{ Name = 'Startup apps: no delay'
-           Why  = '(unchecked, not documented) Read by explorer.exe on build 26300. Comment out on a PC with a hard disk; delete both values to get the delay back.'
+           Why  = '(unchecked, not documented) Startup apps start straight away, not 10 seconds after sign-in. Read by explorer.exe on build 26300. -Restore or deleting both values brings the delay back.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize'
            Value = 'StartupDelayInMSec'; Data = 0 }
         @{ Name = 'Startup apps: no waiting for the PC to go quiet'
            Why  = '(unchecked, not documented)'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize'
            Value = 'WaitForIdleState'; Data = 0 }
-
-        # --- battery ---
-        @{ Name = 'Battery: no Wi-Fi while asleep'
-           Why  = '(policy) ADMX_Power DCConnectivityInStandby_2 off: a sleeping laptop on battery drops Wi-Fi. Mail and messages wait until it wakes; plugged in, nothing changes. Laptops with Modern Standby only.'
-           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Power\PowerSettings\f15576e8-98b7-4186-b944-eafa664402d9'
-           Value = 'DCSettingIndex'; Data = 0 }
+        @{ Name = 'Search without WebView2'
+           Why  = '(not documented) Feature override 1694661260 off: search draws its results without Edge WebView2, using about 75 to 150 MB less RAM. Takes a restart; an update may undo it. If search misbehaves after an update, suspect this first.'
+           Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FeatureManagement\Overrides\8\1694661260'
+           Value = 'EnabledState'; Data = 1 }
 
         # --- system ---
-        @{ Name = 'Clipboard history on'
-           Why  = 'Win+V. Stays on this PC; syncing is a separate switch.'
-           Key  = 'HKCU:\Software\Microsoft\Clipboard'
-           Value = 'EnableClipboardHistory'; Data = 1 }
         @{ Name = 'Storage Sense on'
-           Why  = 'Clears temp files and the Recycle Bin after 30 days. Downloads is never touched.'
+           Why  = 'Clears temp files, and Recycle Bin items older than 30 days, only when the disk runs low (next value). Downloads is never touched.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy'
            Value = '01'; Data = 1 }
+        @{ Name = 'Storage Sense only when the disk runs low'
+           Why  = '(unchecked) Run Storage Sense: "During low free disk space", which is Windows'' default. Set anyway, so it never runs on a schedule.'
+           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy'
+           Value = '2048'; Data = 0 }
         @{ Name = 'Long path support'
-           Why  = 'Paths over 260 characters, for node_modules and the like.'
+           Why  = 'Paths over 260 characters, for node_modules and the like, in apps that support them.'
            Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem'
            Value = 'LongPathsEnabled'; Data = 1 }
+        @{ Name = 'Windows Update active hours set by hand'
+           Why  = '(unchecked) "Adjust active hours automatically" off, or Windows replaces the hours below with its own guess.'
+           Key  = 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings'
+           Value = 'SmartActiveHoursState'; Data = 0 }
         @{ Name = 'Windows Update active hours start 07:00'
            Why  = 'No update restarts between 07:00 and 01:00.'
            Key  = 'HKLM:\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings'

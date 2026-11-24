@@ -1,7 +1,7 @@
 @{
-    # Privacy on my own PCs only; skipped on a work PC, where IT may rely on
-    # diagnostics and Find my device, and Office's online features are wanted.
-    # Format: see tweaks.psd1.
+    # Stricter privacy, for whoever wants it: Setup asks, default no. Never on a
+    # work PC, where IT may rely on diagnostics and Find my device, and Office's
+    # online features are wanted. Format: see tweaks-general.psd1.
     Privacy = @(
 
         # --- diagnostics ---
@@ -21,7 +21,7 @@
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\FindMyDevice'
            Value = 'AllowFindMyDevice'; Data = 0 }
 
-        # --- search (on a work PC, results from the work account are wanted) ---
+        # --- search ---
         @{ Name = 'No cloud content in search'
            Why  = '(policy) Search/AllowCloudSearch: no OneDrive, Outlook or other account results in Windows search.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
@@ -52,7 +52,7 @@
            Key  = 'HKCU:\Software\Policies\Microsoft\office\16.0\common\privacy'
            Value = 'controllerconnectedservicesenabled'; Data = 2 }
         @{ Name = 'Office: no diagnostic data'
-           Why  = '(policy) Required service data is still sent.'
+           Why  = '(policy) 3 = neither required nor optional diagnostic data. Required service data is still sent.'
            Key  = 'HKCU:\Software\Policies\Microsoft\office\common\clienttelemetry'
            Value = 'sendtelemetry'; Data = 3 }
     )

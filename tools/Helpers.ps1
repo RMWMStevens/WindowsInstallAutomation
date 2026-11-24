@@ -6,11 +6,13 @@ $script:LogPath = $null
 $script:DocsDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsInstallAutomation'
 $script:SpareDir = Join-Path $env:SystemDrive 'WindowsInstallAutomation'   # when Documents is blocked
 $script:WorkDir = $script:DocsDir   # logs and black.png; Start-Log picks one of the two
+# In every log name, so logs that OneDrive syncs in from other PCs are left alone.
+$script:PcId = "$((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Cryptography' -ErrorAction SilentlyContinue).MachineGuid)" -replace '^(.{8}).*', '$1'
 
 # Loaded with -WhatIf off: under -WhatIf they print a screen of "What if" lines.
 $whatIf = $global:WhatIfPreference
 $global:WhatIfPreference = $false
-Import-Module Appx, Dism -Global -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
+Import-Module Appx, Dism, CimCmdlets -Global -ErrorAction SilentlyContinue -WarningAction SilentlyContinue
 $global:WhatIfPreference = $whatIf
 
 # winget writes UTF-8.
@@ -38,16 +40,16 @@ function Start-Log {
     if ($problem) { Write-Log "$problem $(if ($script:LogPath) { "Logging to $script:LogPath instead." } else { 'No log for this run.' })" -Level Warn }
     if (-not $script:LogPath) { return }
     Set-Content (Join-Path $script:WorkDir 'README.txt') -Encoding UTF8 -WhatIf:$false -ErrorAction SilentlyContinue -Value @'
-WindowsInstallAutomation sets up Windows 11 PCs: it installs apps, removes
-pre-installed ones and applies settings.
+WindowsInstallAutomation set up this PC: it installed apps, removed
+pre-installed ones and changed settings. What it does and why:
 https://github.com/RMWMStevens/WindowsInstallAutomation
 
 Made by Roel Stevens, https://roelstevens.dev
 
-logs\       one log per run. "Setup.cmd -Restore" uses them to undo settings.
+logs\       one log per run. To put the settings back, paste this in PowerShell:
+            & ([scriptblock]::Create((irm https://roelie.cc/wia))) -Restore
+            That needs these logs. It does not put removed apps back.
 black.png   the black background, if chosen.
-
-Nothing on this PC depends on this folder. You can delete it at any time.
 '@
 }
 
@@ -69,16 +71,18 @@ function Write-Log {
     if ($script:LogPath) { "$Level`t$Message" | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false }
 }
 
-# Logs "Name: message" and records the result for the summary.
+# Logs "Name: message" and records the result for the summary. -Warn shows a
+# Skipped result in yellow, for something you may want to act on.
 function Add-Result {
     param(
         [Parameter(Mandatory)][string]$Step,
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][ValidateSet('Changed', 'AlreadySet', 'Skipped', 'Failed', 'WhatIf')][string]$Status,
         [string]$Message,
-        [string]$Detail
+        [string]$Detail,
+        [switch]$Warn
     )
-    $level = @{ Changed = 'Ok'; AlreadySet = 'Skip'; Skipped = 'Skip'; Failed = 'Fail'; WhatIf = 'Info' }[$Status]
+    $level = if ($Warn) { 'Warn' } else { @{ Changed = 'Ok'; AlreadySet = 'Skip'; Skipped = 'Skip'; Failed = 'Fail'; WhatIf = 'Info' }[$Status] }
     if ($Message) { Write-Log "${Name}: $Message" -Level $level }
     if ($Status -eq 'WhatIf') { $Status, $Detail = 'Skipped', 'WhatIf' }
     elseif ($Status -eq 'Failed' -and -not $Detail) { $Detail = $Message }
@@ -107,7 +111,9 @@ function Show-Summary {
 function Request-ExplorerRestart {
     Write-Host ''
     if (Read-YesNo 'Restart Explorer now so the taskbar and Explorer changes show?' -Default $true) {
-        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+        # Only in this session: other accounts that are signed in keep theirs.
+        $session = (Get-Process -Id $PID).SessionId
+        Get-Process explorer -ErrorAction SilentlyContinue | Where-Object SessionId -eq $session | Stop-Process -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -132,9 +138,12 @@ function Read-LogData {
     @(Get-Content $Log.FullName -Encoding UTF8) -like "$Tag`t*" | ForEach-Object { $_.Substring($Tag.Length + 1) | ConvertFrom-Json }
 }
 
-# Logs of earlier runs on this PC, newest first.
+# Logs of earlier runs on this PC, newest first. Logs from before the PC's ID
+# was in the name count as this PC's.
 function Get-SetupLog {
-    Get-ChildItem "$script:DocsDir\logs", "$script:SpareDir\logs" -Filter 'setup-*.log' -ErrorAction SilentlyContinue | Sort-Object Name -Descending -Unique
+    Get-ChildItem "$script:DocsDir\logs", "$script:SpareDir\logs" -Filter 'setup-*.log' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match "^setup-($script:PcId-)?\d{8}-\d{6}\.log$" } |
+        Sort-Object { $_.Name.Substring($_.Name.Length - 19) } -Descending -Unique
 }
 
 # The answers of the newest real run (not a dry run), with its date.
@@ -148,13 +157,13 @@ function Get-LastAnswers {
 # Only questions that were answered last time are shown.
 function Format-Answers {
     param([Parameter(Mandatory)]$Answers)
-    $labels = [ordered]@{ WorkPC = 'work PC'; Tweaks = 'tweaks'; Privacy = 'privacy'; UpdateAll = 'update all'
-        RemoveXbox = 'remove Xbox'; Personal = 'personal'; StartPins = 'Start pins'; Cleanup = 'clean-up' }
+    $labels = [ordered]@{ WorkPC = 'work PC'; Tweaks = 'tweaks'; Privacy = 'privacy'; PrivacyStrict = 'strict privacy'
+        UpdateApps = 'update apps'; RemoveXbox = 'remove Xbox'; Personal = 'personal'; StartPins = 'Start pins'; Cleanup = 'clean-up' }
     $parts = @(foreach ($key in $labels.Keys) {
             if ($null -ne $Answers.$key) { "$($labels[$key]) $(if ($Answers.$key) { 'yes' } else { 'no' })" }
         })
-    $kept = @($Answers.KeepSponsored | Where-Object { $_ })
-    if ($kept) { $parts += "sponsored apps kept: $($kept -join ', ')" }
+    $kept = @($Answers.Keep | Where-Object { $_ })
+    if ($kept) { $parts += "kept: $($kept -join ', ')" }
     $parts -join ', '
 }
 
@@ -186,10 +195,23 @@ function Test-IsAdmin {
     (New-Object Security.Principal.WindowsPrincipal $id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+# Why an organisation manages this PC, or nothing: joined to a domain or to
+# Entra ID, or enrolled in device management (Intune and the like). Adding a
+# work account to a personal PC does not count.
+function Get-ManagedReason {
+    if ((Get-CimInstance Win32_ComputerSystem).PartOfDomain) { return 'joined to a domain' }
+    if (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\CloudDomainJoin\JoinInfo\*') { return 'joined to Entra ID' }
+    # Windows keeps entries of its own here; those have no user.
+    $mdm = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Enrollments' -ErrorAction SilentlyContinue |
+        Get-ItemProperty -ErrorAction SilentlyContinue | Where-Object { $_.ProviderID -and $_.UPN }
+    if ($mdm) { 'enrolled in device management' }
+}
+
 
 # === 0. Restore point ========================================================
 
-# Returns $true when there is one to fall back on.
+# Returns $true when there is one to fall back on. Turns on System Protection
+# for the system drive when it is off.
 function New-RestorePoint {
     $name = 'Restore point'
     if ($WhatIfPreference) { Add-Result safety $name WhatIf 'would create one'; return $true }
@@ -210,13 +232,14 @@ function New-RestorePoint {
 
 # === 1. Removing =============================================================
 
-# User folders (Desktop, Documents...) that OneDrive backup moved into OneDrive.
-# Removing OneDrive then would leave them pointing at files that may only be in
-# the cloud.
-function Get-FoldersInOneDrive {
-    $roots = @($env:OneDrive, $env:OneDriveConsumer, $env:OneDriveCommercial)
-    $roots += Get-ChildItem 'HKCU:\Software\Microsoft\OneDrive\Accounts' -ErrorAction SilentlyContinue |
-        ForEach-Object { (Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).UserFolder }
+# Why OneDrive is in use, or nothing: someone is signed in to it, or OneDrive
+# backup moved user folders (Desktop, Documents...) into it. Removing it then
+# would stop the sync without a word and leave files that are only in the
+# cloud unopenable.
+function Get-OneDriveUse {
+    $accounts = @(Get-ChildItem 'HKCU:\Software\Microsoft\OneDrive\Accounts' -ErrorAction SilentlyContinue | Get-ItemProperty -ErrorAction SilentlyContinue)
+    if ($accounts | Where-Object { $_.UserEmail }) { return 'someone is signed in to OneDrive' }
+    $roots = @($env:OneDrive, $env:OneDriveConsumer, $env:OneDriveCommercial) + @($accounts | ForEach-Object { $_.UserFolder })
     $roots = @($roots | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') } | Sort-Object -Unique)
     $shell = Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders' -ErrorAction SilentlyContinue
     if (-not $roots -or -not $shell) { return }
@@ -224,14 +247,15 @@ function Get-FoldersInOneDrive {
     # Only the folders backup can move. The key also lists OneDrive's own folders.
     $folders = [ordered]@{ 'Desktop' = 'Desktop'; 'Personal' = 'Documents'; 'My Pictures' = 'Pictures'; 'My Music' = 'Music'
         'My Video' = 'Videos'; '{374DE290-123F-4565-9164-39C4925E467B}' = 'Downloads' }
-    foreach ($name in $folders.Keys) {
-        if (-not $shell.$name) { continue }
-        $path = [Environment]::ExpandEnvironmentVariables([string]$shell.$name).TrimEnd('\')
-        if ($roots | Where-Object { $path -eq $_ -or $path.StartsWith("$_\", [StringComparison]::OrdinalIgnoreCase) }) { $folders[$name] }
-    }
+    $moved = @(foreach ($name in $folders.Keys) {
+            if (-not $shell.$name) { continue }
+            $path = [Environment]::ExpandEnvironmentVariables([string]$shell.$name).TrimEnd('\')
+            if ($roots | Where-Object { $path -eq $_ -or $path.StartsWith("$_\", [StringComparison]::OrdinalIgnoreCase) }) { $folders[$name] }
+        })
+    if ($moved) { "OneDrive backs up $($moved -join ', ')" }
 }
 
-# Never removed, whatever remove.psd1 says: without the Store and winget nothing
+# Never removed, whatever apps-remove.psd1 says: without the Store and winget nothing
 # can be installed back. Packages Windows marks as part of the system are
 # refused as well.
 $script:ProtectedPackages = @(
@@ -260,10 +284,11 @@ function Get-InstalledStoreApp {
         Where-Object { -not $admin -or ($_.PackageUserInformation | Where-Object { "$($_.InstallState)" -eq 'Installed' }) })
 }
 
-# Removed for every account and from Windows' copy, which also keeps it out of
-# feature updates. Can be reinstalled from the Store.
+# Removed for every account, with its data, and from Windows' copy, which also
+# keeps it out of feature updates. Most can be reinstalled from the Store.
+# Guard 'OneDrive': kept while OneDrive is in use.
 function Remove-StoreApp {
-    param([Parameter(Mandatory)][string]$Package, [Parameter(Mandatory)][string]$Name, [switch]$Xbox)
+    param([Parameter(Mandatory)][string]$Package, [Parameter(Mandatory)][string]$Name, [switch]$Xbox, [string]$Guard)
     if ($script:ProtectedPackages | Where-Object { $Package -like $_ }) { return Add-Result remove $Name Skipped "refused, '$Package' is protected" }
     if (-not $Xbox -and ($script:XboxPackages | Where-Object { $Package -like $_ })) { return Add-Result remove $Name Skipped 'refused, Xbox parts only go through the Xbox question' }
 
@@ -271,6 +296,7 @@ function Remove-StoreApp {
     if ($installed | Where-Object { $_.NonRemovable }) { return Add-Result remove $Name Skipped 'refused, Windows marks it as part of the system' }
     $provisioned = @(Get-ProvisionedApp | Where-Object { $_.DisplayName -like $Package })
     if (-not $installed -and -not $provisioned) { return Add-Result remove $Name AlreadySet 'not present' }
+    if ($Guard -eq 'OneDrive' -and ($use = Get-OneDriveUse)) { return Add-Result remove $Name Skipped "kept, $use" }
 
     $what = @($(if ($installed) { 'installed' }), $(if ($provisioned) { 'copy for new users' }) | Where-Object { $_ }) -join ' + '
     if ($WhatIfPreference) { return Add-Result remove $Name WhatIf "would remove ($what)" }
@@ -286,51 +312,64 @@ function Remove-StoreApp {
     catch { Add-Result remove $Name Failed $_.Exception.Message }
 }
 
-# The sponsored apps from remove.psd1 on this PC. Pushed: in Windows' copy for
-# new accounts, so Windows or the PC maker put it there. Otherwise someone
-# installed it from the Store (the sponsored tiles in Start only download the
-# app when clicked).
-function Get-SponsoredApp {
-    param([object[]]$List)
+# The entries of apps-remove.psd1's Remove and Sponsored lists that are on this
+# PC, for the keep list. Pushed: in Windows' copy for new accounts, so Windows
+# or the PC maker put it there. A sponsored app without that was installed by
+# someone from the Store (the sponsored tiles in Start only download the app
+# when clicked). Windows features are left out.
+function Get-PresentApp {
+    param([object[]]$Remove, [object[]]$Sponsored)
     $admin = Test-IsAdmin
     $all = @(Get-AppxPackage -AllUsers:$admin -ErrorAction SilentlyContinue)
     $provisioned = @(Get-ProvisionedApp)
-    foreach ($s in $List) {
-        $pushed = [bool]($provisioned | Where-Object { $_.DisplayName -like $s.Package })
-        $hits = @($all | Where-Object { $_.Name -like $s.Package })
-        if ($admin) { $hits = @($hits | Where-Object { $_.PackageUserInformation | Where-Object { "$($_.InstallState)" -eq 'Installed' } }) }
-        if ($pushed -or $hits) { [pscustomobject]@{ Name = $s.Name; Package = $s.Package; Pushed = $pushed } }
+    foreach ($e in @($Remove) + @($Sponsored | ForEach-Object { $_ + @{ Sponsored = $true } })) {
+        $pushed = $false
+        if ($e.Uninstall) { $here = [bool](Get-InstalledProgram $e.Uninstall) }
+        elseif ($e.Package) {
+            $pushed = [bool]($provisioned | Where-Object { $_.DisplayName -like $e.Package })
+            $hits = @($all | Where-Object { $_.Name -like $e.Package })
+            if ($admin) { $hits = @($hits | Where-Object { $_.PackageUserInformation | Where-Object { "$($_.InstallState)" -eq 'Installed' } }) }
+            $here = $pushed -or $hits
+        }
+        else { continue }
+        if ($here) {
+            [pscustomobject]@{ Name = $e.Name; Package = $e.Package; Sponsored = [bool]$e.Sponsored; Pushed = $pushed
+                KeepOnWork = [bool]$e.KeepOnWork; PartOf = $e.PartOf }
+        }
     }
 }
 
-# Returns the ones you keep. Enter keeps none.
-function Read-SponsoredToKeep {
-    param([Parameter(Mandatory)][object[]]$Found)
+# The keep list. Returns the names you keep; Enter keeps none.
+function Read-AppsToKeep {
+    param([Parameter(Mandatory)][object[]]$Apps)
     Write-Host ''
-    Write-Host '  Sponsored apps that came with this PC. They are removed unless you keep them:' -ForegroundColor Cyan
-    for ($i = 0; $i -lt $Found.Count; $i++) { Write-Host ('    {0,2}  {1}' -f ($i + 1), $Found[$i].Name) }
+    Write-Host '  Setup removes these apps from this PC, with their data. Keep any?' -ForegroundColor Cyan
+    for ($i = 0; $i -lt $Apps.Count; $i++) { Write-Host ('    {0,2}  {1}{2}' -f ($i + 1), $Apps[$i].Name, $(if ($Apps[$i].Sponsored) { '  (sponsored)' })) }
     try { $answer = Read-Host '  Numbers to keep (Enter removes them all)' } catch { return }
     foreach ($token in ("$answer" -split '[,\s]+' | Where-Object { $_ })) {
-        if ($token -match '^\d+$' -and [int]$token -ge 1 -and [int]$token -le $Found.Count) { $Found[[int]$token - 1] }
+        if ($token -match '^\d+$' -and [int]$token -ge 1 -and [int]$token -le $Apps.Count) { $Apps[[int]$token - 1].Name }
         else { Write-Log "'$token' is not one of the numbers, ignored" -Level Warn }
     }
 }
 
-# Programs in Settings > Apps, by name (wildcards ok).
+# Programs in Settings > Apps, by name (wildcards ok, several names ok).
 function Get-InstalledProgram {
-    param([Parameter(Mandatory)][string]$DisplayName)
+    param([Parameter(Mandatory)][string[]]$DisplayName)
     @(Get-ItemProperty -ErrorAction SilentlyContinue -Path @(
             'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
             'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
             'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
-        ) | Where-Object { $_.DisplayName -and $_.DisplayName -like $DisplayName })
+        ) | Where-Object { $n = $_.DisplayName; $n -and ($DisplayName | Where-Object { $n -like $_ }) })
 }
 
-# Through the program's own uninstaller, silently.
+# Through the program's own uninstaller: MSI ones silently, others with the
+# arguments they list, so an entry needs an uninstaller that asks nothing.
+# Guard 'OneDrive': kept while OneDrive is in use.
 function Remove-DesktopApp {
-    param([Parameter(Mandatory)][string]$DisplayName, [Parameter(Mandatory)][string]$Name, [string[]]$StopProcess)
+    param([Parameter(Mandatory)][string]$DisplayName, [Parameter(Mandatory)][string]$Name, [string[]]$StopProcess, [string]$Guard)
     $entries = @(Get-InstalledProgram $DisplayName | Where-Object { $_.QuietUninstallString -or $_.UninstallString })
     if (-not $entries) { return Add-Result remove $Name AlreadySet 'not present' }
+    if ($Guard -eq 'OneDrive' -and ($use = Get-OneDriveUse)) { return Add-Result remove $Name Skipped "kept, $use" }
     if ($WhatIfPreference) { return Add-Result remove $Name WhatIf "would uninstall ($(($entries.DisplayName | Sort-Object -Unique) -join ', '))" }
 
     if ($StopProcess) { Get-Process -Name $StopProcess -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
@@ -352,7 +391,8 @@ function Remove-DesktopApp {
     else { Add-Result remove $Name Changed 'removed' }
 }
 
-# A Windows optional feature, turned off and its files removed.
+# A Windows optional feature, turned off and its files removed. Turning it on
+# again in Windows Features downloads them again.
 function Disable-OptionalFeature {
     param([Parameter(Mandatory)][string]$Feature, [Parameter(Mandatory)][string]$Name)
     if (-not (Test-IsAdmin)) { return Add-Result remove $Name Skipped 'cannot check without admin' }
@@ -369,7 +409,7 @@ function Disable-OptionalFeature {
 }
 
 
-# === 2. Installing ===========================================================
+# === 2. Installing and updating ==============================================
 
 # The numbered app menu. $Choice skips it and takes the same input: all, none,
 # group names, numbers, ranges like 20-25.
@@ -422,13 +462,20 @@ function Select-Apps {
 }
 
 # On a new install winget only appears once the Store has updated App
-# Installer. Registering it is Microsoft's documented fix.
+# Installer. Registering it is Microsoft's documented fix. Versions before 1.6
+# lack options Setup uses.
 function Initialize-Winget {
-    if (Get-Command winget -ErrorAction SilentlyContinue) { return $true }
-    Write-Log 'winget not found, registering App Installer...'
-    try { Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction Stop } catch { }
-    if (Get-Command winget -ErrorAction SilentlyContinue) { return $true }
-    Add-Result apps winget Failed 'still missing. Update "App Installer" in the Microsoft Store, then run Setup again.'
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+        Write-Log 'winget not found, registering App Installer...'
+        try { Add-AppxPackage -RegisterByFamilyName -MainPackage Microsoft.DesktopAppInstaller_8wekyb3d8bbwe -ErrorAction Stop } catch { }
+    }
+    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { $what = 'missing' }
+    else {
+        $version = "$(& winget --version 2>$null)" -replace '^v|-.*$'
+        if (($version -as [version]) -ge [version]'1.6') { return $true }
+        $what = "version $version is too old"
+    }
+    Add-Result apps winget Failed "$what. Update ""App Installer"" in the Microsoft Store, then run Setup again."
     $false
 }
 
@@ -441,6 +488,29 @@ function Test-AppInstalled {
     $LASTEXITCODE -eq 0 -and ($listed -join "`n") -match [regex]::Escape($App.Id)
 }
 
+# The winget exit codes Setup explains, from winget's returnCodes.md. Any other
+# code is a failure; the log has winget's own words.
+$script:WingetResults = @{
+    -1978335189 = 'AlreadySet', 'up to date'                                                     # UPDATE_NOT_APPLICABLE
+    -1978335135 = 'AlreadySet', 'already installed'                                              # PACKAGE_ALREADY_INSTALLED
+    -1978335128 = 'AlreadySet', 'kept on its version by a winget pin'                            # PACKAGE_IS_PINNED
+    -1978334967 = 'Changed', 'done, restart the PC to finish'                                    # INSTALL_REBOOT_REQUIRED_TO_FINISH
+    -1978335212 = 'Failed', 'not found in winget, run tools\Test-AppIds.ps1'                     # NO_APPLICATIONS_FOUND
+    -1978335090 = 'Skipped', 'the new version installs differently: uninstall the app, then install it again'   # UPDATE_INSTALL_TECHNOLOGY_MISMATCH
+    -1978334975 = 'Failed', 'it is open: close it and run Setup again'                           # INSTALL_PACKAGE_IN_USE
+    -1978334973 = 'Failed', 'it is open: close it and run Setup again'                           # INSTALL_FILE_IN_USE
+    -1978335146 = 'Failed', 'its installer will not run as admin: install it yourself'           # INSTALLER_PROHIBITS_ELEVATION
+}
+
+# Records a winget install or update by its exit code. $Done: the word for 0.
+function Add-WingetResult {
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][int]$Exit, [Parameter(Mandatory)][string]$Done)
+    $status, $message = 'Failed', "winget exit $Exit (see the log)"
+    if ($Exit -eq 0) { $status, $message = 'Changed', $Done }
+    elseif ($script:WingetResults.ContainsKey($Exit)) { $status, $message = $script:WingetResults[$Exit] }
+    Add-Result apps $Name $status $message -Warn:($status -eq 'Skipped')
+}
+
 function Install-WingetApp {
     param([Parameter(Mandatory)][string]$Id, [Parameter(Mandatory)][string]$Name, [string]$Source = 'winget')
     if (Test-AppInstalled @{ Id = $Id; Source = $Source }) { return Add-Result apps $Name AlreadySet 'already installed' }
@@ -450,104 +520,43 @@ function Install-WingetApp {
     $out = & winget install --id $Id --exact --silent --source $Source `
         --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | Out-String
     if ($script:LogPath) { $out | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false }
-
-    if ($LASTEXITCODE -eq 0) { Add-Result apps $Name Changed 'installed' }
-    elseif ($LASTEXITCODE -in -1978335189, -1978335135) { Add-Result apps $Name AlreadySet 'already installed' }
-    else { Add-Result apps $Name Failed "winget exit $LASTEXITCODE (see the log)" }
+    Add-WingetResult $Name $LASTEXITCODE 'installed'
 }
 
-# What winget would update: Name, Id, Version. Read by column position, so it
-# works in any Windows language. Pinned apps are not listed. In a narrow window
-# winget cuts long IDs short with an ellipsis; such an ID becomes the one in
-# $Known that starts the same.
-function Get-WingetUpdates {
-    param([string[]]$Known)
-    $lines = @(& winget upgrade --accept-source-agreements --disable-interactivity 2>$null | ForEach-Object { ("$_" -split "`r")[-1] })
-    $dashes = [array]::FindIndex([string[]]$lines, [Predicate[string]] { param($l) $l -match '^-{20,}$' })
-    if ($dashes -lt 1) { return }
-    $columns = [regex]::Matches($lines[$dashes - 1], '\S+')   # Name, Id, Version, Available, Source
-    if ($columns.Count -lt 5) { return }
-    $idAt, $versionAt, $sourceAt = $columns[1].Index, $columns[2].Index, $columns[4].Index
-    foreach ($row in $lines[($dashes + 1)..($lines.Count - 1)]) {
-        # Rows end in one word at the Source column; the text under the table does not.
-        if ($row.Length -le $sourceAt -or $row.Substring($sourceAt).Trim() -match '\s') { break }
-        $id = $row.Substring($idAt).Trim().Split(' ')[0]
-        if ($id.EndsWith([char]0x2026)) {
-            $start = $id.Substring(0, $id.Length - 1)
-            $hits = @($Known | Where-Object { $_.StartsWith($start, [StringComparison]::OrdinalIgnoreCase) })
-            if ($hits.Count -eq 1) { $id = $hits[0] }
+# "Update apps": the winget apps from the menu that are on this PC, one at a
+# time. Store apps are left to the Store, NoUpdate ones update another way.
+# SameMajor: a winget pin keeps it on its major version, read from Settings >
+# Apps (Detect). That pin stays after Setup.
+function Update-Apps {
+    param([Parameter(Mandatory)][object[]]$Apps)
+    $common = '--exact', '--source', 'winget', '--accept-source-agreements', '--disable-interactivity'
+    $any = $false
+    foreach ($app in $Apps | Where-Object { $_.Id -and -not $_.Source -and -not $_.NoUpdate }) {
+        if ($app.SameMajor -and -not $WhatIfPreference -and "$(@(Get-InstalledProgram $app.Detect)[0].DisplayVersion)" -match '^v?(\d+)\.') {
+            $null = & winget pin add --id $app.Id --version "$($Matches[1]).*" --force @common 2>&1
         }
-        [pscustomobject]@{
-            Name    = $row.Substring(0, $idAt).Trim()
-            Id      = $id
-            Version = $row.Substring($versionAt).Trim().Split(' ')[0]
-        }
+        # Lists the app only when it is installed and has a newer version.
+        $listed = & winget list --id $app.Id --upgrade-available @common 2>$null
+        if (($listed -join "`n") -notmatch [regex]::Escape($app.Id)) { continue }
+        $any = $true
+        if ($WhatIfPreference) { Add-Result apps $app.Name WhatIf 'would update'; continue }
+
+        Write-Log "$($app.Name): updating..."
+        $out = & winget upgrade --id $app.Id --silent --accept-package-agreements @common 2>&1 | Out-String
+        if ($script:LogPath) { $out | Add-Content $script:LogPath -Encoding UTF8 -WhatIf:$false }
+        Add-WingetResult $app.Name $LASTEXITCODE 'updated'
     }
+    if (-not $any) { Add-Result apps 'Update apps' AlreadySet 'the apps from the menu are up to date' }
 }
 
-# Pinned so "Update all" skips them. They still get updated:
-#   Microsoft 365     by itself. winget's package would reinstall OneDrive and Teams.
-#   Windows Terminal  by the Store. Setup runs inside it; an update closes the window.
-#   App Installer     by the Store. It is winget itself; updating it mid-run breaks winget.
-#   Visual Studio     by the Visual Studio Installer. Through winget it often fails.
-# Node.js gets a pin on its major version. To move on: winget pin remove OpenJS.NodeJS.LTS
-$script:LeaveAlone = @('Microsoft.Office', 'Microsoft.WindowsTerminal', '9N0DX20HK701', 'Microsoft.AppInstaller', '9NBLGGH4NNS1',
-    'Microsoft.VisualStudio.Community')
-
-function Update-AllApps {
-    $name = 'Update all apps'
-    $before = @(Get-WingetUpdates -Known $script:LeaveAlone | Where-Object { $_.Id -notin $script:LeaveAlone })
-    if (-not $before) { return Add-Result apps $name AlreadySet 'everything is up to date' }
-    if ($WhatIfPreference) { return Add-Result apps $name WhatIf "would update $($before.Count) app(s): $($before.Name -join ', ')" }
-
-    foreach ($id in $script:LeaveAlone) { $null = & winget pin add --id $id --exact --accept-source-agreements --disable-interactivity 2>&1 }
-    $node = $before | Where-Object { $_.Id -eq 'OpenJS.NodeJS.LTS' }
-    if ($node -and $node.Version -match '^v?(\d+)\.') {
-        $null = & winget pin add --id OpenJS.NodeJS.LTS --exact --version "$($Matches[1]).*" --force --accept-source-agreements --disable-interactivity 2>&1
-    }
-
-    # One line per app on screen, all of winget's output in the log. $tried
-    # keeps winget's last result line per app it tried.
-    Write-Log "${name}: updating, this can take a while..."
-    $tried, $id = @{}, $null
-    & winget upgrade --all --silent --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 | ForEach-Object {
-        $line = ("$_" -split "`r")[-1]
-        if ($script:LogPath) { Add-Content $script:LogPath $line -Encoding UTF8 -WhatIf:$false }
-        if ($line -match '^\((\d+)/(\d+)\)\s+\S+\s+(.+?)\s+\[(.+?)\]') {
-            $id = $Matches[4]
-            $tried[$id] = ''
-            Write-Host "    ($($Matches[1])/$($Matches[2])) $($Matches[3])" -ForegroundColor Gray
-        }
-        elseif ($id -and $line -match 'Successfully installed|exit code') { $tried[$id] = $line }
-    }
-    $exit = $LASTEXITCODE
-
-    # Still offered means not updated. Apps winget did not even try need a fresh
-    # install. One that just installed fine can still show the old version for
-    # a moment; that is no failure.
-    $left = @(Get-WingetUpdates -Known $tried.Keys | Where-Object { $tried[$_.Id] -notmatch 'Successfully installed' })
-    foreach ($app in $left) {
-        if (-not $tried.ContainsKey($app.Id)) { Add-Result apps $app.Name Failed 'not updated, the new version needs a fresh install: uninstall the app, then install it again.' }
-        else {
-            $code = if ($tried[$app.Id] -match 'exit code:?\s*(-?\d+)') { " (exit $($Matches[1]))" }
-            Add-Result apps $app.Name Failed "not updated, the installer failed$code. Often the app was open: close it and run Setup again."
-        }
-    }
-    if ($left) {
-        if ($before.Count -gt $left.Count) { Add-Result apps $name Changed "$($before.Count - $left.Count) of $($before.Count) app(s) updated" }
-        return
-    }
-    if ($exit -notin 0, -1978335189, -1978335212) { Add-Result apps $name Failed "winget exit $exit (see the log)" }
-    else { Add-Result apps $name Changed 'done' }
-}
-
-# For an app winget cannot install reliably. Refused unless validly signed by $Signer.
+# For an app winget cannot install reliably. Refused unless validly signed by
+# $Signer. Left alone when anything matching $Detect is installed.
 function Install-FromUrl {
     param(
         [Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Url, [Parameter(Mandatory)][string]$Signer,
-        [Parameter(Mandatory)][string]$Detect, [string]$Arguments
+        [Parameter(Mandatory)][string[]]$Detect, [string]$Arguments
     )
-    if (Get-InstalledProgram $Detect) { return Add-Result apps $Name AlreadySet 'already installed' }
+    if ($found = @(Get-InstalledProgram $Detect)) { return Add-Result apps $Name AlreadySet "already installed: $($found[0].DisplayName)" }
     if ($WhatIfPreference) { return Add-Result apps $Name WhatIf 'would download and install' }
 
     $file = Join-Path $env:TEMP ([IO.Path]::GetFileName(([uri]$Url).AbsolutePath))
@@ -593,11 +602,14 @@ function Save-Undo {
 }
 
 # Returns $true when it changed something. An empty $Value is the key's
-# (default) value.
+# (default) value. A value someone set to something else is left alone with
+# $IfData (only change it from that value, Windows' default) and, on a work
+# PC, with -KeepPolicies for policies, which IT may have set.
 function Set-RegValue {
     param(
         [Parameter(Mandatory)][string]$Key, [string]$Value = '', [Parameter(Mandatory)][AllowEmptyString()]$Data,
-        [string]$Type = 'DWord', [Parameter(Mandatory)][string]$Label, [string]$Step = 'settings'
+        [string]$Type = 'DWord', [Parameter(Mandatory)][string]$Label, [string]$Step = 'settings',
+        [string]$IfData, [switch]$KeepPolicies
     )
     $valueName = if ($Value) { $Value } else { '(default)' }
     $shown = if ("$Data".Length -gt 50) { "$("$Data".Substring(0, 47))..." } else { "$Data" }
@@ -605,6 +617,9 @@ function Set-RegValue {
         $current = if (Test-Path -LiteralPath $Key) { (Get-Item -LiteralPath $Key).GetValue($Value) }
         $was = if ($null -eq $current) { 'not set' } elseif ("$current".Length -gt 50) { 'something else' } else { "'$current'" }
         if ($null -ne $current -and "$current" -eq "$Data") { return Add-Result $Step $Label AlreadySet "already $valueName=$shown" }
+        if ($null -ne $current -and (($IfData -and "$current" -ne $IfData) -or ($KeepPolicies -and $Key -like '*\Policies\*'))) {
+            return Add-Result $Step $Label Skipped "left alone, someone set $valueName to $was"
+        }
         if ($WhatIfPreference) { return Add-Result $Step $Label WhatIf "would set $valueName=$shown (now $was)" }
 
         Save-Undo -Key $Key -Value $Value -Label $Label
@@ -618,15 +633,53 @@ function Set-RegValue {
 
 # Applies one settings file. Returns $true when Explorer needs a restart.
 function Set-RegList {
-    param([Parameter(Mandatory)][object[]]$Items, [Parameter(Mandatory)][string]$Step)
+    param([Parameter(Mandatory)][object[]]$Items, [Parameter(Mandatory)][string]$Step, [switch]$KeepPolicies)
     $restart = $false
     foreach ($t in $Items) {
+        if ($t.TaskbarAutoHide) { Set-TaskbarAutoHide -Name $t.Name -Step $Step; continue }
         # Never create the key of a service this PC does not have.
         if ($t.IfPresent -and -not (Test-Path -LiteralPath $t.Key)) { Add-Result $Step $t.Name AlreadySet 'not on this PC'; continue }
         $type = if ($t.Type) { $t.Type } else { 'DWord' }
-        if ((Set-RegValue -Key $t.Key -Value "$($t.Value)" -Data $t.Data -Type $type -Label $t.Name -Step $Step) -and $t.Explorer) { $restart = $true }
+        $set = Set-RegValue -Key $t.Key -Value "$($t.Value)" -Data $t.Data -Type $type -Label $t.Name -Step $Step `
+            -IfData "$($t.IfData)" -KeepPolicies:$KeepPolicies
+        if ($set -and $t.Explorer) { $restart = $true }
     }
     $restart
+}
+
+# Reads taskbar auto-hide, or sets it with -On, through the call Windows
+# documents for it (SHAppBarMessage), as Settings does: it shows at once.
+# Returns whether it is on.
+function Invoke-AutoHide {
+    param($On)
+    Add-NativeType
+    $bar = New-Object WIA.Native+APPBARDATA
+    $bar.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($bar)
+    # ABM_SETSTATE is 10, ABM_GETSTATE 4; ABS_AUTOHIDE is 1.
+    if ($null -ne $On) { $bar.lParam = [IntPtr][int][bool]$On; $null = [WIA.Native]::SHAppBarMessage(10, [ref]$bar) }
+    [bool]([WIA.Native]::SHAppBarMessage(4, [ref]$bar).ToUInt64() -band 1)
+}
+
+# "Automatically hide the taskbar". Windows writes it to its own value (byte 8
+# of StuckRects3\Settings, next to the screen layout) only later, so Setup
+# sets that bit too: otherwise restarting Explorer brings the taskbar back.
+$script:StuckRects = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'
+function Set-TaskbarAutoHide {
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Step)
+    $blob = (Get-Item -LiteralPath $script:StuckRects -ErrorAction SilentlyContinue).GetValue('Settings')
+    $stored = $blob -isnot [byte[]] -or $blob.Length -le 8 -or ($blob[8] -band 1)   # a new account has no value yet
+    if ($stored -and (Invoke-AutoHide)) { return Add-Result $Step $Name AlreadySet 'already on' }
+    if ($WhatIfPreference) { return Add-Result $Step $Name WhatIf 'would turn it on' }
+    try {
+        Save-Undo -Key $script:StuckRects -Value 'Settings' -Label $Name
+        if (-not (Invoke-AutoHide $true)) { throw 'Windows did not turn it on' }
+        if (-not $stored) {
+            $blob[8] = $blob[8] -bor 1
+            Set-ItemProperty -LiteralPath $script:StuckRects -Name Settings -Value $blob -ErrorAction Stop
+        }
+        Add-Result $Step $Name Changed 'turned on'
+    }
+    catch { Add-Result $Step $Name Failed "$($_.Exception.Message)" }
 }
 
 
@@ -643,23 +696,52 @@ function Rename-ThisPC {
     catch { Add-Result extras $name Failed $_.Exception.Message }
 }
 
-# The desktop picture (empty = none) and colour ("R G B"), the way Settings
-# sets them. Both show straight away.
-function Set-DesktopPicture {
-    param([string]$Path, [string]$Colour)
-    if (-not ('WIA.Wallpaper' -as [type])) {
-        Add-Type -Namespace WIA -Name Wallpaper -MemberDefinition @'
+# Windows functions PowerShell has no command for, compiled on first use.
+function Add-NativeType {
+    if ('WIA.Native' -as [type]) { return }
+    Add-Type -Namespace WIA -Name Native -MemberDefinition @'
 [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
 public static extern bool SystemParametersInfo(int action, int param, string value, int flags);
 [DllImport("user32.dll", SetLastError = true)]
 public static extern bool SetSysColors(int count, int[] elements, int[] colors);
+[DllImport("kernel32.dll")]
+public static extern uint SetThreadExecutionState(uint flags);
+[StructLayout(LayoutKind.Sequential)]
+public struct APPBARDATA { public int cbSize; public IntPtr hWnd; public uint uCallbackMessage; public uint uEdge; public int left, top, right, bottom; public IntPtr lParam; }
+[DllImport("shell32.dll")]
+public static extern UIntPtr SHAppBarMessage(uint message, ref APPBARDATA data);
 '@
-    }
-    if ($Colour -match '^\s*(\d+)\s+(\d+)\s+(\d+)\s*$') {
-        $null = [WIA.Wallpaper]::SetSysColors(1, @(1), @([int]$Matches[1] + 256 * [int]$Matches[2] + 65536 * [int]$Matches[3]))
-    }
-    if (-not [WIA.Wallpaper]::SystemParametersInfo(0x14, 0, "$Path", 3)) { throw 'Windows refused the desktop background' }
 }
+
+# Keeps the PC awake while Setup runs on its own, so a laptop does not go to
+# sleep halfway. The screen stays on too: only that keeps a Modern Standby
+# laptop out of standby.
+function Set-KeepAwake {
+    param([Parameter(Mandatory)][bool]$On)
+    Add-NativeType
+    # ES_CONTINUOUS (0x80000000), plus ES_SYSTEM_REQUIRED and ES_DISPLAY_REQUIRED (1 and 2) when on.
+    $null = [WIA.Native]::SetThreadExecutionState($(if ($On) { 2147483651 } else { 2147483648 }))
+}
+
+# The desktop picture (empty = none) and colour ("R G B"), the way Settings
+# sets them. Both show straight away.
+function Set-DesktopPicture {
+    param([string]$Path, [string]$Colour)
+    Add-NativeType
+    if ($Colour -match '^\s*(\d+)\s+(\d+)\s+(\d+)\s*$') {
+        $null = [WIA.Native]::SetSysColors(1, @(1), @([int]$Matches[1] + 256 * [int]$Matches[2] + 65536 * [int]$Matches[3]))
+    }
+    if (-not [WIA.Native]::SystemParametersInfo(0x14, 0, "$Path", 3)) { throw 'Windows refused the desktop background' }
+}
+
+# Values Setup sets outside the data files: the black background, the Start
+# pins and taskbar auto-hide. -Restore puts back only these and the ones in the
+# data files.
+$script:OwnValues = @(
+    'HKCU:\Control Panel\Desktop|WallpaperStyle', 'HKCU:\Control Panel\Desktop|TileWallpaper', 'HKCU:\Control Panel\Desktop|WallPaper'
+    'HKCU:\Control Panel\Colors|Background', 'HKCU:\Software\Policies\Microsoft\Windows\Explorer|ConfigureStartPins'
+    "$script:StuckRects|Settings"
+)
 
 # Black on the desktop and the lock screen, so also on the sign-in screen.
 # Changeable in Settings afterwards.
@@ -793,9 +875,12 @@ function Restore-RegValue {
 }
 
 # Puts back every value earlier runs changed: newest run first, last change
-# first. Each log then gets a "Restored" line so it is not used twice.
-# Returns $true when something changed.
+# first. Only values in $Allowed (the data files and Setup's own), so a log
+# someone edited cannot set anything else. A run that put everything back
+# gets a "Restored" line, so it is not used twice. Returns $true when
+# something changed.
 function Restore-Settings {
+    param([Parameter(Mandatory)][string[]]$Allowed)
     $runs = @(foreach ($log in Get-SetupLog) {
             if (Select-String -LiteralPath $log.FullName -Pattern '^Restored\t' -Quiet) { continue }
             $undo = @(Read-LogData $log 'Undo')
@@ -812,22 +897,36 @@ function Restore-Settings {
         return $false
     }
 
-    $changed = $wallpaper = $false
+    $changed = $wallpaper = $taskbar = $false
     foreach ($run in $runs) {
+        $failedBefore = @($script:Results | Where-Object Status -eq 'Failed').Count
         for ($i = $run.Undo.Count - 1; $i -ge 0; $i--) {
             $u = $run.Undo[$i]
+            if ("$($u.Key)|$($u.Value)" -notin $Allowed) {
+                Add-Result restore $u.Label Skipped "left alone, $($u.Key) $($u.Value) is not in Setup's lists (any more)"
+                continue
+            }
             if (Restore-RegValue $u) {
                 $changed = $true
                 if ($u.Value -eq 'WallPaper') { $wallpaper = $true }
+                if ($u.Key -eq $script:StuckRects) { $taskbar = $true }
             }
         }
-        # Can fail when Documents is blocked; harmless, its values are back.
-        if (-not $WhatIfPreference) { "Restored`t$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Add-Content $run.Log.FullName -Encoding UTF8 -ErrorAction SilentlyContinue }
+        # Can fail when Documents is blocked; then the next -Restore finds its values already back.
+        $failed = @($script:Results | Where-Object Status -eq 'Failed').Count -gt $failedBefore
+        if (-not $failed -and -not $WhatIfPreference) {
+            "Restored`t$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" | Add-Content $run.Log.FullName -Encoding UTF8 -ErrorAction SilentlyContinue
+        }
     }
     if ($wallpaper) {
         try { Set-DesktopPicture (Get-ItemProperty 'HKCU:\Control Panel\Desktop').WallPaper (Get-ItemProperty 'HKCU:\Control Panel\Colors').Background }
         catch { Write-Log "Desktop picture: $($_.Exception.Message). It shows after signing out and in." -Level Warn }
         Write-Log 'The lock screen stays black. Pick another picture in Settings > Personalization > Lock screen.' -Level Warn
+    }
+    # The taskbar takes the restored auto-hide at once too.
+    if ($taskbar) {
+        $blob = (Get-Item -LiteralPath $script:StuckRects -ErrorAction SilentlyContinue).GetValue('Settings')
+        $null = Invoke-AutoHide ($blob -is [byte[]] -and $blob.Length -gt 8 -and ($blob[8] -band 1))
     }
     $changed
 }

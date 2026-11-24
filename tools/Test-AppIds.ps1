@@ -1,7 +1,8 @@
-# Checks that every app in data\apps.psd1 still exists in winget (IDs get
-# renamed, and an install with a renamed ID fails quietly).
+# Checks that every app in data\apps-install.psd1 still exists in winget, and that
+# direct downloads still answer. IDs get renamed; Setup then reports the app
+# as "not found in winget".
 
-$apps = (Import-PowerShellDataFile (Join-Path (Split-Path $PSScriptRoot) 'data\apps.psd1')).Apps
+$apps = (Import-PowerShellDataFile (Join-Path (Split-Path $PSScriptRoot) 'data\apps-install.psd1')).Apps
 $bad = foreach ($app in $apps) {
     if ($app.Url) {
         $what = $app.Url

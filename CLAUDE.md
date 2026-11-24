@@ -40,17 +40,32 @@ My Windows 11 setup script. PowerShell 5.1, console only, no GUI. Started with
 - Clock seconds and the classic context menu. Show file extensions is commented
   out on purpose. Mouse acceleration stays on.
 - Turning off cloud content in Windows search on a work PC (work account
-  results are wanted there). On my own PCs it is off, in privacy-personal.psd1.
+  results are wanted there). Elsewhere it is in privacy-strict.psd1, if wanted.
 - Not worth automating: Windows Update, anything with 2FA, restoring data.
 - A MANUAL.md checklist; it was too specific to me.
+- A stable branch or tag for the one-liner; it runs main.
+- Windows 10 support. Setup stops on it.
+- Removing an older Office to install Microsoft 365; Setup leaves any Office alone.
 
 ## Background
 
 - Widgets: Windows blocks scripts from writing its policy (AllowNewsAndInterests,
-  "unauthorized operation"), so remove.psd1 removes the app instead.
+  "unauthorized operation"), so apps-remove.psd1 removes the app instead.
 - Search without WebView2 (feature 1694661260), tested Nov 2026 on build 26300:
-  Search's 6 WebView2 processes (214 MB) went away, SearchHost grew from 58 MB to
+  Search's 6 WebView2 processes (214 MB of RAM) went away, SearchHost grew from 58 MB to
   117-197 MB. If search breaks after an update, suspect this first.
 - Sponsored apps count as sponsored only when provisioned (Windows or the PC
   maker put them there). Installed but not provisioned: someone chose it, it stays.
 - With Copilot and Recall removed, the Copilot key opens Windows Search.
+- Managed PC: domain joined, Entra joined (CloudDomainJoin\JoinInfo) or an
+  Enrollments entry with both ProviderID and UPN. Windows keeps 30-odd
+  entries of its own under Enrollments, without a UPN.
+- `winget list --upgrade-available` exits 0 also when nothing matches, so
+  Update-Apps looks for the ID in its output instead.
+- Taskbar auto-hide is set with SHAppBarMessage (ABM_SETSTATE), as Settings
+  does; it shows at once. Windows only writes it to byte 8 of
+  StuckRects3\Settings later, so Setup sets that bit too, or restarting
+  Explorer brings the taskbar back. The rest of that value is screen layout:
+  never write the whole value from the data files.
+- Friends' PCs have one account, an admin. The account check and the keep
+  list are there as protection anyway.

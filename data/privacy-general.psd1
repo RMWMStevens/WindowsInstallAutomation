@@ -1,7 +1,7 @@
 @{
     # Privacy on every PC, work laptops included: no ad tracking, no typing and
-    # speech collection, no activity history, no AI. What an employer may rely
-    # on is in privacy-personal.psd1. Format: see tweaks.psd1.
+    # speech collection, no activity history, no AI. The stricter set, which an
+    # employer may rely on, is in privacy-strict.psd1. Format: see tweaks-general.psd1.
     Privacy = @(
 
         # --- ads and tracking ---

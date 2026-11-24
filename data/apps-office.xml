@@ -1,14 +1,17 @@
 <Configuration>
   <!--
     Microsoft 365 with Word, Excel and PowerPoint only, for the Office
-    Deployment Tool (see data\apps.psd1). Only used for a new install: Setup
-    skips Office when it is already there. For a Personal or Family licence,
-    use O365HomePremRetail. ExcludeApp IDs:
+    Deployment Tool (see data\apps-install.psd1), in the language Windows uses, plus
+    Dutch. Menus stay in the language Windows uses. Only
+    used for a new install: Setup leaves any Office that is already there
+    alone. O365HomePremRetail is for a Family or Personal licence; for a work
+    or school account Setup asks, and uses a copy with O365ProPlusRetail.
+    ExcludeApp IDs:
     https://learn.microsoft.com/microsoft-365-apps/deploy/office-deployment-tool-configuration-options
   -->
   <Add OfficeClientEdition="64" Channel="Current">
-    <Product ID="O365ProPlusRetail">
-      <Language ID="en-us" />
+    <Product ID="O365HomePremRetail">
+      <Language ID="MatchOS" Fallback="en-us" />
       <Language ID="nl-nl" />
       <ExcludeApp ID="Access" />
       <ExcludeApp ID="OneNote" />

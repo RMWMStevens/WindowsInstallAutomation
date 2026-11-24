@@ -1,11 +1,15 @@
 @{
-    # Removed on every run, so whatever comes back goes again. Kinds of entry:
-    #   Package     a Store app, removed for every account and from Windows' copy
-    #               for new accounts. Name: Get-AppxPackage *name* | Select Name
-    #   Uninstall   a desktop program, by its name in Settings > Apps (wildcards ok)
-    #   Feature     a Windows optional feature
+    # Removed on every run, so whatever comes back goes again, except what you
+    # keep: Setup lists the ones on the PC first. Kinds of entry:
+    #   Package     a Store app, removed for every account (with its data) and from
+    #               Windows' copy for new accounts. Name: Get-AppxPackage *name* | Select Name
+    #   Uninstall   a desktop program, by its name in Settings > Apps (wildcards ok).
+    #               Its uninstaller must not ask anything, or Setup waits for it.
+    #   Feature     a Windows optional feature; not in the keep list
     #   KeepOnWork  kept when you answer yes to "Is this a work PC?"
-    #   Guard       OneDriveFolders: refused while user folders are backed up into OneDrive
+    #   PartOf      goes or stays with the app named; not in the keep list itself
+    #   Guard       OneDrive: kept while someone is signed in to OneDrive or it
+    #               backs up user folders
     # tools\Helpers.ps1 refuses system parts (Store, winget, Security, Photos,
     # Notepad, Terminal, Paint, runtimes), and Xbox parts outside the Xbox list.
     Remove = @(
@@ -32,23 +36,24 @@
         @{ Name = 'New Outlook';              Package = 'Microsoft.OutlookForWindows'; KeepOnWork = $true }
         @{ Name = 'Quick Assist';             Package = 'MicrosoftCorporationII.QuickAssist'; KeepOnWork = $true }
         @{ Name = 'Phone Link';               Package = 'Microsoft.YourPhone' }
-        @{ Name = 'Mobile devices';           Package = 'MicrosoftWindows.CrossDevice' }   # Phone Link's background part
+        @{ Name = 'Mobile devices';           Package = 'MicrosoftWindows.CrossDevice'; PartOf = 'Phone Link' }   # also the phone features in Settings
         @{ Name = 'Copilot';                  Package = 'Microsoft.Copilot' }
         @{ Name = 'Copilot+ AI Hub';          Package = 'Microsoft.Windows.AIHub' }
         @{ Name = 'Microsoft 365 companions'; Package = 'Microsoft.M365Companions'; KeepOnWork = $true }
         @{ Name = 'Family Safety';            Package = 'MicrosoftCorporationII.MicrosoftFamily' }
-        # OneDrive and Teams, every part. data\office.xml keeps Microsoft 365 from bringing them back.
-        @{ Name = 'OneDrive';                 Uninstall = 'Microsoft OneDrive'; StopProcess = 'OneDrive'; Guard = 'OneDriveFolders'; KeepOnWork = $true }
-        @{ Name = 'OneDrive shell integration'; Package = 'Microsoft.OneDriveSync'; Guard = 'OneDriveFolders'; KeepOnWork = $true }
+        # OneDrive and Teams, every part. data\apps-office.xml keeps Microsoft 365 from bringing them back.
+        @{ Name = 'OneDrive';                 Uninstall = 'Microsoft OneDrive'; StopProcess = 'OneDrive'; Guard = 'OneDrive'; KeepOnWork = $true }
+        @{ Name = 'OneDrive shell integration'; Package = 'Microsoft.OneDriveSync'; Guard = 'OneDrive'; KeepOnWork = $true; PartOf = 'OneDrive' }
         @{ Name = 'Teams';                    Package = 'MSTeams'; KeepOnWork = $true }
         @{ Name = 'Teams (personal)';         Package = 'MicrosoftTeams' }
-        @{ Name = 'Teams Outlook add-in';     Uninstall = 'Microsoft Teams Meeting Add-in*'; KeepOnWork = $true }
+        @{ Name = 'Teams Outlook add-in';     Uninstall = 'Microsoft Teams Meeting Add-in*'; KeepOnWork = $true; PartOf = 'Teams' }
         @{ Name = 'Recall';                   Feature = 'Recall' }   # Copilot+ PCs only
     )
 
     # Removed only when Windows or the PC maker put them there (they are in
     # Windows' copy for new accounts), unless you keep them. Installed by
-    # someone from the Store: they stay. List from Win11Debloat.
+    # someone from the Store: they stay, and are not in the keep list. List
+    # from Win11Debloat.
     Sponsored = @(
         @{ Name = 'ACG Media Player';         Package = '*ACGMediaPlayer*' }
         @{ Name = 'Actipro Software';         Package = '*ActiproSoftwareLLC*' }
