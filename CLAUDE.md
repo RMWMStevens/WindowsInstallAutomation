@@ -24,7 +24,8 @@ My Windows 11 setup script. PowerShell 5.1, console only, no GUI. Started with
   Never from blog posts.
 - On a work PC, Office is IT's: Setup never installs or removes Office or
   its parts (every Outlook, Teams and its add-in, OneDrive, the Microsoft 365
-  app). Settings with `NotOnWork` are left alone there too.
+  app). Settings with `NotOnWork` are left alone there too, except the Edge
+  Copilot ones that tweaks-personal.psd1 repeats, for my own work laptop.
 - Leave services, scheduled tasks, firewall, Defender and activation alone.
   Exception, on request: the Windows AI service (WSAIFabricSvc).
 - Every registry write goes through Set-RegValue or Save-Undo, so -Restore can undo it.
@@ -52,6 +53,8 @@ My Windows 11 setup script. PowerShell 5.1, console only, no GUI. Started with
 - Windows 10 support. Setup stops on it.
 - Removing an older Office to install Microsoft 365; Setup leaves any Office alone.
 - Keeping Recall on a work PC; it goes everywhere. Accepting a Dutch "j" for yes.
+- Gaming tweaks: Windows' defaults cover Game Mode and GPU scheduling; the rest
+  is BIOS, the graphics driver or blog-post folklore.
 
 ## Background
 

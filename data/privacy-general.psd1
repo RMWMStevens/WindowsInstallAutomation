@@ -103,7 +103,8 @@
 
         # --- Edge AI (Edge policies) ---
         # The first four not on a work PC: employers may pay for Microsoft 365
-        # Copilot Chat, which sits in the sidebar.
+        # Copilot Chat, which sits in the sidebar. tweaks-personal.psd1 has
+        # them too, so they also apply on my own work laptop.
         @{ Name = 'Edge: no sidebar'
            Why  = '(policy) The sidebar is where Copilot sits.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'

@@ -65,6 +65,25 @@
            Key  = 'HKCU:\Software\Microsoft\TabletTip\1.7'
            Value = 'EnableAutocorrection'; Data = 0 }
 
+        # --- Edge, also on a work PC ---
+        # The same four as in privacy-general.psd1, which leaves them alone on a work PC.
+        @{ Name = 'Edge: no sidebar'
+           Why  = '(policy) The sidebar is where Copilot sits.'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'HubsSidebarEnabled'; Data = 0 }
+        @{ Name = 'Edge: no Copilot Chat button'
+           Why  = '(policy)'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'Microsoft365CopilotChatIconEnabled'; Data = 0 }
+        @{ Name = 'Edge: Copilot cannot read the page (work profiles)'
+           Why  = '(policy)'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'CopilotPageContext'; Data = 0 }
+        @{ Name = 'Edge: work Copilot cannot read pages or history'
+           Why  = '(policy)'
+           Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
+           Value = 'EdgeEntraCopilotPageContext'; Data = 0 }
+
         # --- system ---
         @{ Name = 'Clipboard history on'
            Why  = 'Win+V. Stays on this PC; syncing is a separate switch.'

@@ -163,11 +163,11 @@ scheduled tasks, the firewall, antivirus settings and activation.
   settings, so diagnostic data, error reports, Find my device and Office's
   online features stay the way IT set them. It leaves the Windows AI service
   alone, as IT may roll out AI features that need it, and Edge's sidebar and
-  Copilot Chat, which employers may pay for. A policy that already has another
-  value is left alone, as IT may have set it, but Setup cannot see every
-  setting IT makes through Intune. So on someone else's work laptop, ask
-  their IT first. The Copilot app, Recall and the personal Teams app are
-  still removed.
+  Copilot Chat, which employers may pay for (Personal: yes still turns those
+  off). A policy that already has another value is left alone, as IT may have
+  set it, but Setup cannot see every setting IT makes through Intune. So on
+  someone else's work laptop, ask their IT first. The Copilot app, Recall and
+  the personal Teams app are still removed.
 - **Tweaks: yes** (default) applies `data\tweaks-general.psd1`.
 - **Privacy: yes** (default) applies `data\privacy-general.psd1`.
 - **Strict privacy: yes** also applies `data\privacy-strict.psd1`.
@@ -234,6 +234,7 @@ does and where it comes from.
   details, and shows no recent files or frequent folders.
 - **Dark mode** for Windows and apps.
 - **Typing**: no autocorrect or text suggestions.
+- **Edge**: no sidebar or Copilot, also on a work PC.
 - **Misc**: clipboard history (Win+V); a sleeping laptop on battery drops
   Wi-Fi, so mail and messages arrive once it wakes.
 

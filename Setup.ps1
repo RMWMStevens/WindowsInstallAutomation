@@ -8,8 +8,8 @@
       1. Remove apps       data\apps-remove.psd1 and sponsored apps, except the ones you keep; Xbox if you say so
       2. Install apps      the ones you picked; then, if you say so, update the menu's apps on this PC
       3. Tweaks            data\tweaks-general.psd1
-      4. Personal          data\tweaks-personal.psd1, and my Start pins if you want them
-      5. Privacy           data\privacy-general.psd1, and data\privacy-strict.psd1 if you want it
+      4. Privacy           data\privacy-general.psd1, and data\privacy-strict.psd1 if you want it
+      5. Personal          data\tweaks-personal.psd1, and my Start pins if you want them
       6. Extras            new PC name, black background
       7. Clean-up          DISM /StartComponentCleanup
     Every step checks first, so running it again only changes what has drifted.
@@ -225,12 +225,12 @@ try {
     }
 
 
-    # === 3-5. Tweaks, personal, privacy ======================================
+    # === 3-5. Tweaks, privacy, personal ======================================
     $restartExplorer = $false
     foreach ($set in @(
             @{ Title = 'Tweaks';   Step = 'tweaks';   Wanted = $doTweaks;   Items = $tweaks }
-            @{ Title = 'Personal'; Step = 'personal'; Wanted = $doPersonal; Items = $personal }
-            @{ Title = 'Privacy';  Step = 'privacy';  Wanted = $doPrivacy;  Items = $privacyAll })) {
+            @{ Title = 'Privacy';  Step = 'privacy';  Wanted = $doPrivacy;  Items = $privacyAll }
+            @{ Title = 'Personal'; Step = 'personal'; Wanted = $doPersonal; Items = $personal })) {
         Write-Log $set.Title -Level Step
         if (-not $set.Wanted) { Write-Log 'Skipped, you said no' -Level Skip; continue }
         if (Set-RegList -Items $set.Items -Step $set.Step -WorkPC:$workPC) { $restartExplorer = $true }
