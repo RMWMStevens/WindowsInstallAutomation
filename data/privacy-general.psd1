@@ -101,23 +101,25 @@
            Key  = 'HKLM:\SYSTEM\CurrentControlSet\Services\WSAIFabricSvc'
            Value = 'Start'; Data = 4; IfPresent = $true; NotOnWork = $true }
 
-        # --- Edge AI (Edge policies; some only matter for work accounts) ---
+        # --- Edge AI (Edge policies) ---
+        # The first four not on a work PC: employers may pay for Microsoft 365
+        # Copilot Chat, which sits in the sidebar.
         @{ Name = 'Edge: no sidebar'
            Why  = '(policy) The sidebar is where Copilot sits.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
-           Value = 'HubsSidebarEnabled'; Data = 0 }
+           Value = 'HubsSidebarEnabled'; Data = 0; NotOnWork = $true }
         @{ Name = 'Edge: no Copilot Chat button'
            Why  = '(policy)'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
-           Value = 'Microsoft365CopilotChatIconEnabled'; Data = 0 }
+           Value = 'Microsoft365CopilotChatIconEnabled'; Data = 0; NotOnWork = $true }
         @{ Name = 'Edge: Copilot cannot read the page (work profiles)'
            Why  = '(policy) Copilot in the sidebar cannot read the open page. Only for Edge profiles signed in with a work or school account; with a personal account, no sidebar (above) does this.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
-           Value = 'CopilotPageContext'; Data = 0 }
+           Value = 'CopilotPageContext'; Data = 0; NotOnWork = $true }
         @{ Name = 'Edge: work Copilot cannot read pages or history'
            Why  = '(policy)'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
-           Value = 'EdgeEntraCopilotPageContext'; Data = 0 }
+           Value = 'EdgeEntraCopilotPageContext'; Data = 0; NotOnWork = $true }
         @{ Name = 'Edge: no AI writing in text fields'
            Why  = '(policy)'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'

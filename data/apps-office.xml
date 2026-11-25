@@ -1,12 +1,13 @@
 <Configuration>
   <!--
     Microsoft 365 with Word, Excel and PowerPoint only, for the Office
-    Deployment Tool (see data\apps-install.psd1), in the language Windows uses, plus
-    Dutch. Menus stay in the language Windows uses. Only
-    used for a new install: Setup leaves any Office that is already there
-    alone, and never installs it on a work PC. O365HomePremRetail is for a
-    Family or Personal licence; for a work or school account Setup asks, and
-    uses a copy with O365ProPlusRetail (enterprise and school plans).
+    Deployment Tool (see data\apps-install.psd1), in the language Windows
+    uses, plus Dutch. Menus stay in the language Windows uses. Only used for
+    a new install: Setup leaves any Office that is already there alone, and
+    never installs it on a work PC. O365HomePremRetail is for a Family or
+    Personal licence. Setup asks whether you sign in with a work or school
+    account; then it uses a copy with O365ProPlusRetail (enterprise and
+    school plans).
     ExcludeApp IDs:
     https://learn.microsoft.com/microsoft-365-apps/deploy/office-deployment-tool-configuration-options
   -->

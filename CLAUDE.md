@@ -51,6 +51,7 @@ My Windows 11 setup script. PowerShell 5.1, console only, no GUI. Started with
 - A stable branch or tag for the one-liner; it runs main.
 - Windows 10 support. Setup stops on it.
 - Removing an older Office to install Microsoft 365; Setup leaves any Office alone.
+- Keeping Recall on a work PC; it goes everywhere. Accepting a Dutch "j" for yes.
 
 ## Background
 
@@ -72,5 +73,11 @@ My Windows 11 setup script. PowerShell 5.1, console only, no GUI. Started with
   StuckRects3\Settings later, so Setup sets that bit too, or restarting
   Explorer brings the taskbar back. The rest of that value is screen layout:
   never write the whole value from the data files.
+- Start-Process -Wait in Windows PowerShell also waits for every process the
+  installer starts. Kept on purpose: uninstallers that restart themselves from
+  %TEMP% need it. An installer that leaves a program running (a browser, say)
+  makes Setup wait until it closes.
+- The spare log folder must stay private to the account (AppData\Local):
+  -Restore trusts the logs for this account's own settings.
 - Friends' PCs have one account, an admin. The account check and the keep
   list are there as protection anyway.

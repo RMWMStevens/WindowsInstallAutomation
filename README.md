@@ -103,20 +103,19 @@ only, in the language Windows uses plus Dutch (`data\apps-office.xml`). The
 menus follow Windows; to drop Dutch, uninstall its own entry (ending in
 "- nl-nl") in Settings > Apps. Picking it asks once more, because it is a big
 download, and then whether you will sign in with a work or school account;
-say no for Microsoft 365 Family or Personal. Setup does
-not activate it: open Word and sign in. It installs last. When Office is
-already on the PC, Microsoft 365 or an older Office like Office 2021, Setup
-leaves it alone; to switch, uninstall it in Settings > Apps first. On a work
-PC, Setup never installs or removes Office, even when you pick it: that is
-IT's.
+say no for Microsoft 365 Family or Personal. Setup does not activate it: open
+Word and sign in. It installs last. When Office is already on the PC,
+Microsoft 365 or an older Office like Office 2021, Setup leaves it alone; to
+switch, uninstall it in Settings > Apps first. On a work PC, Setup never
+installs or removes Office, even when you pick it: that is IT's.
 
 **The keep list**: after the first questions, Setup lists the apps from
 `data\apps-remove.psd1` that are on this PC, with the sponsored apps (Candy
-Crush, TikTok, Netflix and the like) that Windows or the PC maker put there. Type the
-numbers of the ones to keep, on a friend's PC for example; Enter removes them
-all. Sponsored apps someone installed from the Store are not listed and stay.
-The sponsored tiles in Start are not apps, only links to the Store; unpin them
-by hand.
+Crush, TikTok, Netflix and the like) that Windows or the PC maker put there.
+Type the numbers of the ones to keep, on a friend's PC for example; Enter
+removes them all. Sponsored apps someone installed from the Store are not
+listed and stay. The sponsored tiles in Start are not apps, only links to the
+Store; unpin them by hand.
 
 ## What Setup does
 
@@ -163,9 +162,12 @@ scheduled tasks, the firewall, antivirus settings and activation.
   Power Automate and Sticky Notes. It skips the rename and the strict privacy
   settings, so diagnostic data, error reports, Find my device and Office's
   online features stay the way IT set them. It leaves the Windows AI service
-  alone, as IT may roll out AI features that need it. A policy that already
-  has another value is left alone, as IT may have set it. The Copilot app and
-  the personal Teams app are still removed.
+  alone, as IT may roll out AI features that need it, and Edge's sidebar and
+  Copilot Chat, which employers may pay for. A policy that already has another
+  value is left alone, as IT may have set it, but Setup cannot see every
+  setting IT makes through Intune. So on someone else's work laptop, ask
+  their IT first. The Copilot app, Recall and the personal Teams app are
+  still removed.
 - **Tweaks: yes** (default) applies `data\tweaks-general.psd1`.
 - **Privacy: yes** (default) applies `data\privacy-general.psd1`.
 - **Strict privacy: yes** also applies `data\privacy-strict.psd1`.
@@ -225,10 +227,9 @@ does and where it comes from.
 **Personal** (`data\tweaks-personal.psd1`), my own taste:
 
 - **Taskbar**: hides itself until you point at it, icons on the left, no task
-  view button and no search box
-  (typing in Start still searches); the clock also shows in the notification
-  center. Start shows no recently added apps. Alt+Tab shows windows, not
-  browser tabs.
+  view button and no search box (typing in Start still searches); the clock
+  also shows in the notification center. Start shows no recently added apps.
+  Alt+Tab shows windows, not browser tabs.
 - **Explorer** opens on This PC, shows hidden files and the copy window's
   details, and shows no recent files or frequent folders.
 - **Dark mode** for Windows and apps.
@@ -244,8 +245,8 @@ does and where it comes from.
   voice typing (Win+H) may not work.
 - AI: Recall and its snapshots, Click to Do and the AI in Settings, Paint and
   Notepad are off, and the Windows AI service is disabled (not on a work PC).
-  Edge: no sidebar or Copilot, no AI writing or history search, and its local
-  AI model is deleted.
+  Edge: no sidebar or Copilot (not on a work PC), no AI writing or history
+  search, and its local AI model is deleted.
 
 **Strict privacy** (`data\privacy-strict.psd1`), never on a work PC:
 
@@ -312,9 +313,9 @@ Not put back:
   them). Change them in Settings.
 - System Protection, and the winget pin on Node.js.
 - Runs from before `-Restore` existed (November 2026), which did not write
-  down the old values, runs whose log has no PC ID in its name (before 24
-  November 2026), runs whose logs were deleted, and runs by another account
-  (their logs are in that account's Documents).
+  down the old values, runs whose log has no PC ID in its name (the first
+  versions, `setup-<date>.log`), runs whose logs were deleted, and runs by
+  another account (their logs are in that account's own folders).
 
 System Restore can undo more, back to a restore point from before the first
 run, but removed Store apps often come back broken, and a feature update
@@ -394,10 +395,10 @@ sign-in.
   approved the admin prompt, and sync along when Documents is backed up to
   OneDrive; each log carries the PC's ID, so Setup only reads this PC's. If
   Setup cannot write there (Controlled folder access can block it), it says
-  so and uses `C:\WindowsInstallAutomation` instead; `-Restore` reads both.
-  The summary always shows where the log is. The black background picture
-  lives in that folder too, next to a `README.txt`. Delete the folder whenever
-  you like; only `-Restore` needs the logs.
+  so and uses `%LOCALAPPDATA%\WindowsInstallAutomation` instead; `-Restore`
+  reads both. The summary always shows where the log is. The black background
+  picture lives in that folder too, next to a `README.txt`. Delete the folder
+  whenever you like; only `-Restore` needs the logs.
 - **If PowerShell is restricted** on a PC (company policies can do that),
   Setup says so and stops.
 - **Registry keys move between Windows releases.** If a setting stops working

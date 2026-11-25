@@ -4,7 +4,7 @@
 $script:Results = [System.Collections.Generic.List[object]]::new()
 $script:LogPath = $null
 $script:DocsDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsInstallAutomation'
-$script:SpareDir = Join-Path $env:SystemDrive 'WindowsInstallAutomation'   # when Documents is blocked
+$script:SpareDir = Join-Path $env:LOCALAPPDATA 'WindowsInstallAutomation'   # when Documents is blocked. Never a shared folder: -Restore trusts these logs.
 $script:WorkDir = $script:DocsDir   # logs and black.png; Start-Log picks one of the two
 # In every log name, so logs that OneDrive syncs in from other PCs are left alone.
 $script:PcId = "$((Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Cryptography' -ErrorAction SilentlyContinue).MachineGuid)" -replace '^(.{8}).*', '$1'
@@ -22,7 +22,7 @@ try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catc
 # === Logging, questions, answers =============================================
 
 # Logs go to Documents. When that is blocked (Controlled folder access, say),
-# to C:\WindowsInstallAutomation. Get-SetupLog reads both.
+# to AppData\Local\WindowsInstallAutomation. Get-SetupLog reads both.
 function Start-Log {
     param([Parameter(Mandatory)][string]$Name)
     $os = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
@@ -890,7 +890,7 @@ function Restore-Settings {
             if ($undo) { [pscustomobject]@{ Log = $log; Undo = $undo } }
         })
     if (-not $runs) {
-        Write-Log 'Nothing to put back. Runs before -Restore existed did not record old values; use the restore point for those.' -Level Skip
+        Write-Log 'Nothing to put back. Runs from before -Restore existed, or with no PC ID in the log name, are not used; use the restore point for those.' -Level Skip
         return $false
     }
     foreach ($run in $runs) { Write-Log "Run of $($run.Log.Date.ToString('d MMM yyyy HH:mm')): $($run.Undo.Count) setting(s)" }
