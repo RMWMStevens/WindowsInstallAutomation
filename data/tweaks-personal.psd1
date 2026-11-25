@@ -74,9 +74,5 @@
            Why  = '(policy) ADMX_Power DCConnectivityInStandby_2 off: a sleeping laptop on battery drops Wi-Fi. Mail and messages wait until it wakes; plugged in, nothing changes. Laptops with Modern Standby only.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Power\PowerSettings\f15576e8-98b7-4186-b944-eafa664402d9'
            Value = 'DCSettingIndex'; Data = 0 }
-        @{ Name = 'Blue screen shows the details'
-           Why  = '(unchecked) The details usually name the driver that crashed.'
-           Key  = 'HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl'
-           Value = 'DisplayParameters'; Data = 1 }
     )
 }

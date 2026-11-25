@@ -3,7 +3,8 @@
     #   Id         winget ID (winget search "<name>"). Check them all: tools\Test-AppIds.ps1
     #   Source     'msstore' for Store apps. Use it too when you already have the Store
     #              version: winget sees the two versions as different apps.
-    #   Ask        $true: big or licensed, one more question and installed last
+    #   Ask        $true: needs a licence, one more question and installed last
+    #   NotOnWork  $true: never installed on a work PC, IT does that
     #   Note       shown when it is picked
     #   NoUpdate   $true: "Update apps" leaves it alone, it updates another way
     #   SameMajor  $true: "Update apps" keeps it on its major version, with a winget pin
@@ -18,7 +19,7 @@
         # winget's Microsoft.Office checks setup.exe against a stored hash and
         # fails whenever Microsoft updates it, so this downloads it directly.
         # Any Office already there, older ones too, is left alone.
-        @{ Group = 'Core'; Name = 'Microsoft 365';  Ask = $true
+        @{ Group = 'Core'; Name = 'Microsoft 365';  Ask = $true; NotOnWork = $true
            Url    = 'https://officecdn.microsoft.com/pr/wsus/setup.exe'   # Office Deployment Tool
            Signer = 'Microsoft Corporation'
            Args   = '/configure "{data}\apps-office.xml"'   # {data} = this folder; Setup asks which licence

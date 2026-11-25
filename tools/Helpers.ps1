@@ -138,19 +138,23 @@ function Read-LogData {
     @(Get-Content $Log.FullName -Encoding UTF8) -like "$Tag`t*" | ForEach-Object { $_.Substring($Tag.Length + 1) | ConvertFrom-Json }
 }
 
-# Logs of earlier runs on this PC, newest first. Logs from before the PC's ID
-# was in the name count as this PC's.
+# Logs of earlier runs on this PC, newest first. Date: when the run started,
+# from the name; -Restore writes to a log afterwards, which changes its file date.
 function Get-SetupLog {
     Get-ChildItem "$script:DocsDir\logs", "$script:SpareDir\logs" -Filter 'setup-*.log' -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match "^setup-($script:PcId-)?\d{8}-\d{6}\.log$" } |
-        Sort-Object { $_.Name.Substring($_.Name.Length - 19) } -Descending -Unique
+        ForEach-Object {
+            if ($_.Name -match "^setup-$script:PcId-(\d{8}-\d{6})\.log$") {
+                $_ | Add-Member Date ([datetime]::ParseExact($Matches[1], 'yyyyMMdd-HHmmss', $null)) -PassThru
+            }
+        } |
+        Sort-Object Date -Descending -Unique
 }
 
 # The answers of the newest real run (not a dry run), with its date.
 function Get-LastAnswers {
     foreach ($log in Get-SetupLog) {
         $answers = Read-LogData $log 'Answers' | Where-Object { -not $_.DryRun } | Select-Object -Last 1
-        if ($answers) { return $answers | Add-Member Date $log.LastWriteTime -PassThru }
+        if ($answers) { return $answers | Add-Member Date $log.Date -PassThru }
     }
 }
 
@@ -633,15 +637,16 @@ function Set-RegValue {
 
 # Applies one settings file. Returns $true when Explorer needs a restart.
 function Set-RegList {
-    param([Parameter(Mandatory)][object[]]$Items, [Parameter(Mandatory)][string]$Step, [switch]$KeepPolicies)
+    param([Parameter(Mandatory)][object[]]$Items, [Parameter(Mandatory)][string]$Step, [switch]$WorkPC)
     $restart = $false
     foreach ($t in $Items) {
+        if ($WorkPC -and $t.NotOnWork) { Add-Result $Step $t.Name Skipped 'left alone, this is a work PC'; continue }
         if ($t.TaskbarAutoHide) { Set-TaskbarAutoHide -Name $t.Name -Step $Step; continue }
         # Never create the key of a service this PC does not have.
         if ($t.IfPresent -and -not (Test-Path -LiteralPath $t.Key)) { Add-Result $Step $t.Name AlreadySet 'not on this PC'; continue }
         $type = if ($t.Type) { $t.Type } else { 'DWord' }
         $set = Set-RegValue -Key $t.Key -Value "$($t.Value)" -Data $t.Data -Type $type -Label $t.Name -Step $Step `
-            -IfData "$($t.IfData)" -KeepPolicies:$KeepPolicies
+            -IfData "$($t.IfData)" -KeepPolicies:$WorkPC
         if ($set -and $t.Explorer) { $restart = $true }
     }
     $restart
@@ -660,24 +665,26 @@ function Invoke-AutoHide {
     [bool]([WIA.Native]::SHAppBarMessage(4, [ref]$bar).ToUInt64() -band 1)
 }
 
-# "Automatically hide the taskbar". Windows writes it to its own value (byte 8
-# of StuckRects3\Settings, next to the screen layout) only later, so Setup
-# sets that bit too: otherwise restarting Explorer brings the taskbar back.
+# "Automatically hide the taskbar", on or off. Windows writes it to its own
+# value (byte 8 of StuckRects3\Settings) only later, so Setup sets that bit
+# too: otherwise restarting Explorer undoes it. Only that bit, also in
+# -Restore: the rest of the value is the screen layout.
 $script:StuckRects = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'
 function Set-TaskbarAutoHide {
-    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Step)
+    param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][string]$Step, [bool]$On = $true)
+    $word = if ($On) { 'on' } else { 'off' }
     $blob = (Get-Item -LiteralPath $script:StuckRects -ErrorAction SilentlyContinue).GetValue('Settings')
-    $stored = $blob -isnot [byte[]] -or $blob.Length -le 8 -or ($blob[8] -band 1)   # a new account has no value yet
-    if ($stored -and (Invoke-AutoHide)) { return Add-Result $Step $Name AlreadySet 'already on' }
-    if ($WhatIfPreference) { return Add-Result $Step $Name WhatIf 'would turn it on' }
+    $stored = $blob -isnot [byte[]] -or $blob.Length -le 8 -or [bool]($blob[8] -band 1) -eq $On   # a new account has no value yet
+    if ($stored -and (Invoke-AutoHide) -eq $On) { return Add-Result $Step $Name AlreadySet "already $word" }
+    if ($WhatIfPreference) { return Add-Result $Step $Name WhatIf "would turn it $word" }
     try {
         Save-Undo -Key $script:StuckRects -Value 'Settings' -Label $Name
-        if (-not (Invoke-AutoHide $true)) { throw 'Windows did not turn it on' }
+        if ((Invoke-AutoHide $On) -ne $On) { throw "Windows did not turn it $word" }
         if (-not $stored) {
-            $blob[8] = $blob[8] -bor 1
+            $blob[8] = if ($On) { $blob[8] -bor 1 } else { $blob[8] -band 254 }
             Set-ItemProperty -LiteralPath $script:StuckRects -Name Settings -Value $blob -ErrorAction Stop
         }
-        Add-Result $Step $Name Changed 'turned on'
+        Add-Result $Step $Name Changed "turned $word"
     }
     catch { Add-Result $Step $Name Failed "$($_.Exception.Message)" }
 }
@@ -734,14 +741,9 @@ function Set-DesktopPicture {
     if (-not [WIA.Native]::SystemParametersInfo(0x14, 0, "$Path", 3)) { throw 'Windows refused the desktop background' }
 }
 
-# Values Setup sets outside the data files: the black background, the Start
-# pins and taskbar auto-hide. -Restore puts back only these and the ones in the
-# data files.
-$script:OwnValues = @(
-    'HKCU:\Control Panel\Desktop|WallpaperStyle', 'HKCU:\Control Panel\Desktop|TileWallpaper', 'HKCU:\Control Panel\Desktop|WallPaper'
-    'HKCU:\Control Panel\Colors|Background', 'HKCU:\Software\Policies\Microsoft\Windows\Explorer|ConfigureStartPins'
-    "$script:StuckRects|Settings"
-)
+# A policy Setup sets outside the data files. -Restore puts back policies and
+# values for the whole PC only when they are here or in the data files.
+$script:OwnValues = @('HKCU:\Software\Policies\Microsoft\Windows\Explorer|ConfigureStartPins')
 
 # Black on the desktop and the lock screen, so also on the sign-in screen.
 # Changeable in Settings afterwards.
@@ -875,10 +877,11 @@ function Restore-RegValue {
 }
 
 # Puts back every value earlier runs changed: newest run first, last change
-# first. Only values in $Allowed (the data files and Setup's own), so a log
-# someone edited cannot set anything else. A run that put everything back
-# gets a "Restored" line, so it is not used twice. Returns $true when
-# something changed.
+# first. Policies and values for the whole PC only when they are in $Allowed
+# (the data files and Setup's own), so a log someone edited cannot change them
+# through this admin run. Other values of this account the account can change
+# itself. A run that put everything back gets a "Restored" line, so it is not
+# used twice. Returns $true when something changed.
 function Restore-Settings {
     param([Parameter(Mandatory)][string[]]$Allowed)
     $runs = @(foreach ($log in Get-SetupLog) {
@@ -890,26 +893,29 @@ function Restore-Settings {
         Write-Log 'Nothing to put back. Runs before -Restore existed did not record old values; use the restore point for those.' -Level Skip
         return $false
     }
-    foreach ($run in $runs) { Write-Log "Run of $($run.Log.LastWriteTime.ToString('d MMM yyyy HH:mm')): $($run.Undo.Count) setting(s)" }
+    foreach ($run in $runs) { Write-Log "Run of $($run.Log.Date.ToString('d MMM yyyy HH:mm')): $($run.Undo.Count) setting(s)" }
     $total = ($runs | ForEach-Object { $_.Undo.Count } | Measure-Object -Sum).Sum
     if (-not $WhatIfPreference -and -not (Read-YesNo "Put these $total setting(s) back the way they were?")) {
         Write-Log 'Nothing put back.' -Level Skip
         return $false
     }
 
-    $changed = $wallpaper = $taskbar = $false
+    $changed = $wallpaper = $false
     foreach ($run in $runs) {
         $failedBefore = @($script:Results | Where-Object Status -eq 'Failed').Count
         for ($i = $run.Undo.Count - 1; $i -ge 0; $i--) {
             $u = $run.Undo[$i]
-            if ("$($u.Key)|$($u.Value)" -notin $Allowed) {
-                Add-Result restore $u.Label Skipped "left alone, $($u.Key) $($u.Value) is not in Setup's lists (any more)"
+            if ($u.Key -eq $script:StuckRects) {
+                Set-TaskbarAutoHide -Name $u.Label -Step restore -On ($u.Existed -and @($u.Data).Count -gt 8 -and [bool](@($u.Data)[8] -band 1))
+                continue
+            }
+            if ("$($u.Key)" -match '^HKLM:|\\Policies\\' -and "$($u.Key)|$($u.Value)" -notin $Allowed) {
+                Add-Result restore $u.Label Skipped "left alone, $($u.Key) $($u.Value) is not in Setup's lists (any more)" -Warn
                 continue
             }
             if (Restore-RegValue $u) {
                 $changed = $true
                 if ($u.Value -eq 'WallPaper') { $wallpaper = $true }
-                if ($u.Key -eq $script:StuckRects) { $taskbar = $true }
             }
         }
         # Can fail when Documents is blocked; then the next -Restore finds its values already back.
@@ -922,11 +928,6 @@ function Restore-Settings {
         try { Set-DesktopPicture (Get-ItemProperty 'HKCU:\Control Panel\Desktop').WallPaper (Get-ItemProperty 'HKCU:\Control Panel\Colors').Background }
         catch { Write-Log "Desktop picture: $($_.Exception.Message). It shows after signing out and in." -Level Warn }
         Write-Log 'The lock screen stays black. Pick another picture in Settings > Personalization > Lock screen.' -Level Warn
-    }
-    # The taskbar takes the restored auto-hide at once too.
-    if ($taskbar) {
-        $blob = (Get-Item -LiteralPath $script:StuckRects -ErrorAction SilentlyContinue).GetValue('Settings')
-        $null = Invoke-AutoHide ($blob -is [byte[]] -and $blob.Length -gt 8 -and ($blob[8] -band 1))
     }
     $changed
 }

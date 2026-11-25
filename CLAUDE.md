@@ -19,7 +19,12 @@ My Windows 11 setup script. PowerShell 5.1, console only, no GUI. Started with
 
 - Only settings I understand. A value is captured on my own PC after flipping
   the switch (no mark), or documented by Microsoft `(policy)`. Otherwise
-  `(unchecked)`: flip the switch by hand once and check. Never from blog posts.
+  `(unchecked)`: flip the switch by hand once and check. `(not documented)`:
+  it works, but Microsoft does not describe it; it can go with `(unchecked)`.
+  Never from blog posts.
+- On a work PC, Office is IT's: Setup never installs or removes Office or
+  its parts (every Outlook, Teams and its add-in, OneDrive, the Microsoft 365
+  app). Settings with `NotOnWork` are left alone there too.
 - Leave services, scheduled tasks, firewall, Defender and activation alone.
   Exception, on request: the Windows AI service (WSAIFabricSvc).
 - Every registry write goes through Set-RegValue or Save-Undo, so -Restore can undo it.

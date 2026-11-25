@@ -97,9 +97,9 @@
            Key  = 'HKLM:\SOFTWARE\Policies\WindowsNotepad'
            Value = 'DisableAIFeatures'; Data = 1 }
         @{ Name = 'Windows AI service off'
-           Why  = '(unchecked, not documented) WSAIFabricSvc runs Windows'' on-device AI. Disabled from the next restart; its packages cannot be removed. Any AI feature still on stops working. -Restore puts it back.'
+           Why  = '(unchecked, not documented) WSAIFabricSvc runs Windows'' on-device AI. Disabled from the next restart; its packages cannot be removed. Any AI feature still on stops working. -Restore puts it back. Not on a work PC: IT may roll out AI features that need it.'
            Key  = 'HKLM:\SYSTEM\CurrentControlSet\Services\WSAIFabricSvc'
-           Value = 'Start'; Data = 4; IfPresent = $true }
+           Value = 'Start'; Data = 4; IfPresent = $true; NotOnWork = $true }
 
         # --- Edge AI (Edge policies; some only matter for work accounts) ---
         @{ Name = 'Edge: no sidebar'
@@ -110,8 +110,8 @@
            Why  = '(policy)'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
            Value = 'Microsoft365CopilotChatIconEnabled'; Data = 0 }
-        @{ Name = 'Edge: Copilot cannot read the page'
-           Why  = '(policy)'
+        @{ Name = 'Edge: Copilot cannot read the page (work profiles)'
+           Why  = '(policy) Copilot in the sidebar cannot read the open page. Only for Edge profiles signed in with a work or school account; with a personal account, no sidebar (above) does this.'
            Key  = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge'
            Value = 'CopilotPageContext'; Data = 0 }
         @{ Name = 'Edge: work Copilot cannot read pages or history'

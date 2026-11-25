@@ -22,7 +22,7 @@
 
 .EXAMPLE
     .\Setup.cmd -WhatIf
-    Shows what it would do. It changes nothing; it only writes its log. Works with -Restore too.
+    Shows what it would do. It changes nothing; it only writes its log (and the folder's README.txt). Works with -Restore too.
 #>
 #Requires -Version 5.1
 #Requires -PSEdition Desktop
@@ -96,20 +96,6 @@ if ($Restore) {
 # === Questions first, so the rest runs unattended ============================
 $managed = Get-ManagedReason
 $chosen = @(Select-Apps -Apps $appList -Choice $Apps)
-# Big or licensed apps (Ask) get one more question unless already installed, and install last.
-$chosen = @($chosen | Where-Object {
-        -not $_.Ask -or (Test-AppInstalled $_) -or (Read-YesNo "$($_.Name) is a big download and needs a licence to use. Install it?")
-    })
-$chosen = @($chosen | Where-Object { -not $_.Ask }) + @($chosen | Where-Object { $_.Ask })
-
-# data\apps-office.xml is for a Microsoft 365 Family or Personal licence. A work or
-# school account needs the enterprise product, in a copy of the file.
-$office = $chosen | Where-Object { "$($_.Args)" -like '*apps-office.xml*' -and -not (Test-AppInstalled $_) }
-if ($office -and (Read-YesNo 'Will you sign in to Microsoft 365 with a work or school account? (n: Family or Personal)' -Default ([bool]$managed))) {
-    $xml = Join-Path $env:TEMP 'office-work.xml'
-    if (-not $WhatIfPreference) { (Get-Content "$data\apps-office.xml" -Raw).Replace('O365HomePremRetail', 'O365ProPlusRetail') | Set-Content $xml -Encoding UTF8 }
-    $office.Args = "/configure `"$xml`""
-}
 
 $last = Get-LastAnswers
 $same = $false
@@ -132,6 +118,26 @@ $workPC = Read-Answer $(if (-not $askWork) { $reuse }) WorkPC "Is this a work PC
 # Never repeated: the PC name and the black background.
 $newName = if (-not $same -and -not $workPC -and (Test-DefaultComputerName)) { Read-NewComputerName }
 
+# Office is IT's on a work PC.
+if ($workPC) {
+    foreach ($app in $chosen | Where-Object { $_.NotOnWork }) { Write-Log "$($app.Name): left to IT, this is a work PC" -Level Skip }
+    $chosen = @($chosen | Where-Object { -not $_.NotOnWork })
+}
+# Apps that need a licence (Ask) get one more question unless already installed, and install last.
+$chosen = @($chosen | Where-Object {
+        -not $_.Ask -or (Test-AppInstalled $_) -or (Read-YesNo "$($_.Name) is a big download and needs a licence to use. Install it?")
+    })
+$chosen = @($chosen | Where-Object { -not $_.Ask }) + @($chosen | Where-Object { $_.Ask })
+
+# data\apps-office.xml is for a Microsoft 365 Family or Personal licence. A work or
+# school account (enterprise and school plans) needs O365ProPlusRetail, in a copy of the file.
+$office = $chosen | Where-Object { "$($_.Args)" -like '*apps-office.xml*' -and -not (Test-AppInstalled $_) }
+if ($office -and (Read-YesNo 'Will you sign in to Microsoft 365 with a work or school account? (n: Family or Personal)' -Default ([bool]$managed))) {
+    $xml = Join-Path $env:TEMP 'office-work.xml'
+    if (-not $WhatIfPreference) { (Get-Content "$data\apps-office.xml" -Raw).Replace('O365HomePremRetail', 'O365ProPlusRetail') | Set-Content $xml -Encoding UTF8 }
+    $office.Args = "/configure `"$xml`""
+}
+
 # The keep list: apps from apps-remove.psd1 that are on this PC. Sponsored apps only
 # when Windows or the PC maker put them there and you did not pick them, work
 # apps not on a work PC, and parts (PartOf) go with their app.
@@ -153,112 +159,112 @@ Write-LogData 'Answers' @{ WorkPC = $workPC; Tweaks = $doTweaks; Privacy = $doPr
     RemoveXbox = $removeXbox; Personal = $doPersonal; StartPins = $doPins; Cleanup = $doCleanup; Keep = [string[]]@($keep | Where-Object { $_ })
     NewName = "$newName"; BlackBackground = $blackScreen; Same = $same; DryRun = [bool]$WhatIfPreference }
 
-# From here on Setup runs on its own, so the PC must not go to sleep.
+# From here on Setup runs on its own, so the PC must not go to sleep. The
+# finally block lets it sleep again, also after Ctrl+C or an error.
 Set-KeepAwake $true
-
-
-# === 0. Restore point ========================================================
-Write-Log 'Restore point' -Level Step
-if (-not (New-RestorePoint)) {
-    if (-not (Read-YesNo 'No restore point could be made. Continue without one?')) {
-        Write-Log 'Stopped before changing anything.' -Level Warn
-        Set-KeepAwake $false
-        Show-Summary
-        exit 1
+try {
+    # === 0. Restore point ====================================================
+    Write-Log 'Restore point' -Level Step
+    if (-not (New-RestorePoint)) {
+        if (-not (Read-YesNo 'No restore point could be made. Continue without one?')) {
+            Write-Log 'Stopped before changing anything.' -Level Warn
+            Show-Summary
+            exit 1
+        }
+        Write-Log 'Continuing without a restore point.' -Level Warn
     }
-    Write-Log 'Continuing without a restore point.' -Level Warn
-}
 
 
-# === 1. Remove apps ==========================================================
-Write-Log 'Remove apps' -Level Step
-foreach ($r in $removeData.Remove) {
-    if ($workPC -and $r.KeepOnWork) { Add-Result remove $r.Name Skipped 'kept, this is a work PC' 'work PC'; continue }
-    if ($r.Name -in $keep -or ($r.PartOf -and $r.PartOf -in $keep)) { Add-Result remove $r.Name Skipped 'kept, as you asked'; continue }
-    if ($r.Feature)       { Disable-OptionalFeature -Feature $r.Feature -Name $r.Name }
-    elseif ($r.Uninstall) { Remove-DesktopApp -DisplayName $r.Uninstall -Name $r.Name -StopProcess $r.StopProcess -Guard $r.Guard }
-    else                  { Remove-StoreApp -Package $r.Package -Name $r.Name -Guard $r.Guard }
-}
-
-$sponsored = @($present | Where-Object Sponsored)
-foreach ($s in $sponsored) {
-    if (-not $s.Pushed) { Add-Result remove $s.Name Skipped 'kept, someone on this PC installed it' }
-    elseif ($s.Name -in $chosen.Name) { Add-Result remove $s.Name Skipped 'kept, you picked it to install' }
-    elseif ($s.Name -in $keep) { Add-Result remove $s.Name Skipped 'kept, as you asked' }
-    else { Remove-StoreApp -Package $s.Package -Name $s.Name }
-}
-if (-not $sponsored) { Add-Result remove 'Sponsored apps' AlreadySet 'none on this PC' }
-
-if ($removeXbox) { foreach ($x in $removeData.Xbox) { Remove-StoreApp -Package $x.Package -Name $x.Name -Xbox } }
-else { Write-Log 'Xbox apps: kept' -Level Skip }
-
-
-# === 2. Install apps, then update them =======================================
-Write-Log 'Install apps' -Level Step
-$haveWinget = (($chosen | Where-Object { $_.Id }) -or $updateApps) -and (Initialize-Winget)
-foreach ($app in $chosen) {
-    if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
-    if ($app.Url) {
-        Install-FromUrl -Name $app.Name -Url $app.Url -Signer $app.Signer -Detect $app.Detect -Arguments ("$($app.Args)".Replace('{data}', $data))
+    # === 1. Remove apps ======================================================
+    Write-Log 'Remove apps' -Level Step
+    foreach ($r in $removeData.Remove) {
+        if ($workPC -and $r.KeepOnWork) { Add-Result remove $r.Name Skipped 'kept, this is a work PC' 'work PC'; continue }
+        if ($r.Name -in $keep -or ($r.PartOf -and $r.PartOf -in $keep)) { Add-Result remove $r.Name Skipped 'kept, as you asked'; continue }
+        if ($r.Feature)       { Disable-OptionalFeature -Feature $r.Feature -Name $r.Name }
+        elseif ($r.Uninstall) { Remove-DesktopApp -DisplayName $r.Uninstall -Name $r.Name -StopProcess $r.StopProcess -Guard $r.Guard }
+        else                  { Remove-StoreApp -Package $r.Package -Name $r.Name -Guard $r.Guard }
     }
-    elseif ($haveWinget) { Install-WingetApp -Id $app.Id -Name $app.Name -Source $(if ($app.Source) { $app.Source } else { 'winget' }) }
-}
-if (-not $chosen) { Write-Log 'Nothing picked.' }
 
-# Installers can bring removed apps back (Microsoft 365 does), so look again.
-if ($script:Results | Where-Object { $_.Step -eq 'apps' -and $_.Status -eq 'Changed' }) {
-    $again = $removeData.Remove | Where-Object {
-        $_.Package -and -not $_.Guard -and -not ($workPC -and $_.KeepOnWork) -and $_.Name -notin $keep -and $_.PartOf -notin $keep }
-    foreach ($r in $again) {
-        if (Get-InstalledStoreApp $r.Package) { Remove-StoreApp -Package $r.Package -Name "$($r.Name) (came back with an install)" }
+    $sponsored = @($present | Where-Object Sponsored)
+    foreach ($s in $sponsored) {
+        if (-not $s.Pushed) { Add-Result remove $s.Name Skipped 'kept, someone on this PC installed it' }
+        elseif ($s.Name -in $chosen.Name) { Add-Result remove $s.Name Skipped 'kept, you picked it to install' }
+        elseif ($s.Name -in $keep) { Add-Result remove $s.Name Skipped 'kept, as you asked' }
+        else { Remove-StoreApp -Package $s.Package -Name $s.Name }
     }
-}
+    if (-not $sponsored) { Add-Result remove 'Sponsored apps' AlreadySet 'none on this PC' }
 
-if ($updateApps) {
-    Write-Log 'Update apps' -Level Step
-    if ($haveWinget) { Update-Apps -Apps $appList }
-}
+    if ($removeXbox) { foreach ($x in $removeData.Xbox) { Remove-StoreApp -Package $x.Package -Name $x.Name -Xbox } }
+    else { Write-Log 'Xbox apps: kept' -Level Skip }
 
 
-# === 3-5. Tweaks, personal, privacy ==========================================
-$restartExplorer = $false
-foreach ($set in @(
-        @{ Title = 'Tweaks';   Step = 'tweaks';   Wanted = $doTweaks;   Items = $tweaks }
-        @{ Title = 'Personal'; Step = 'personal'; Wanted = $doPersonal; Items = $personal }
-        @{ Title = 'Privacy';  Step = 'privacy';  Wanted = $doPrivacy;  Items = $privacyAll })) {
-    Write-Log $set.Title -Level Step
-    if (-not $set.Wanted) { Write-Log 'Skipped, you said no' -Level Skip; continue }
-    if (Set-RegList -Items $set.Items -Step $set.Step -KeepPolicies:$workPC) { $restartExplorer = $true }
-
-    # Start pins, through the "Configure Start Pins" policy. applyOnce in the
-    # file: they replace the pins at the next sign-in, after that Start is yours.
-    if ($set.Step -eq 'personal' -and $doPins) {
-        $pins = (Get-Content "$data\start-pins.json" -Raw) -replace '\r?\n\s*', ''
-        $null = Set-RegValue -Key 'HKCU:\Software\Policies\Microsoft\Windows\Explorer' -Value 'ConfigureStartPins' `
-            -Data $pins -Type String -Label 'Start pins (show after signing out and in)' -Step 'personal'
+    # === 2. Install apps, then update them ===================================
+    Write-Log 'Install apps' -Level Step
+    $haveWinget = (($chosen | Where-Object { $_.Id }) -or $updateApps) -and (Initialize-Winget)
+    foreach ($app in $chosen) {
+        if ($app.Note) { Write-Log "$($app.Name): $($app.Note)" -Level Warn }
+        if ($app.Url) {
+            Install-FromUrl -Name $app.Name -Url $app.Url -Signer $app.Signer -Detect $app.Detect -Arguments ("$($app.Args)".Replace('{data}', $data))
+        }
+        elseif ($haveWinget) { Install-WingetApp -Id $app.Id -Name $app.Name -Source $(if ($app.Source) { $app.Source } else { 'winget' }) }
     }
-    if ($set.Step -eq 'privacy') {
-        if ($workPC) { Write-Log 'Strict privacy settings: skipped, this is a work PC' -Level Skip }
-        elseif (-not $doStrict) { Write-Log 'Strict privacy settings: skipped, you said no' -Level Skip }
-        elseif (Set-RegList -Items $privacyStrict -Step 'privacy') { $restartExplorer = $true }
+    if (-not $chosen) { Write-Log 'Nothing picked.' }
+
+    # Installers can bring removed apps back (Microsoft 365 does), so look again.
+    if ($script:Results | Where-Object { $_.Step -eq 'apps' -and $_.Status -eq 'Changed' }) {
+        $again = $removeData.Remove | Where-Object {
+            $_.Package -and -not $_.Guard -and -not ($workPC -and $_.KeepOnWork) -and $_.Name -notin $keep -and $_.PartOf -notin $keep }
+        foreach ($r in $again) {
+            if (Get-InstalledStoreApp $r.Package) { Remove-StoreApp -Package $r.Package -Name "$($r.Name) (came back with an install)" }
+        }
     }
+
+    if ($updateApps) {
+        Write-Log 'Update apps' -Level Step
+        if ($haveWinget) { Update-Apps -Apps $appList }
+    }
+
+
+    # === 3-5. Tweaks, personal, privacy ======================================
+    $restartExplorer = $false
+    foreach ($set in @(
+            @{ Title = 'Tweaks';   Step = 'tweaks';   Wanted = $doTweaks;   Items = $tweaks }
+            @{ Title = 'Personal'; Step = 'personal'; Wanted = $doPersonal; Items = $personal }
+            @{ Title = 'Privacy';  Step = 'privacy';  Wanted = $doPrivacy;  Items = $privacyAll })) {
+        Write-Log $set.Title -Level Step
+        if (-not $set.Wanted) { Write-Log 'Skipped, you said no' -Level Skip; continue }
+        if (Set-RegList -Items $set.Items -Step $set.Step -WorkPC:$workPC) { $restartExplorer = $true }
+
+        # Start pins, through the "Configure Start Pins" policy. applyOnce in the
+        # file: they replace the pins at the next sign-in, after that Start is yours.
+        if ($set.Step -eq 'personal' -and $doPins) {
+            $pins = (Get-Content "$data\start-pins.json" -Raw) -replace '\r?\n\s*', ''
+            $null = Set-RegValue -Key 'HKCU:\Software\Policies\Microsoft\Windows\Explorer' -Value 'ConfigureStartPins' `
+                -Data $pins -Type String -Label 'Start pins (show after signing out and in)' -Step 'personal'
+        }
+        if ($set.Step -eq 'privacy') {
+            if ($workPC) { Write-Log 'Strict privacy settings: skipped, this is a work PC' -Level Skip }
+            elseif (-not $doStrict) { Write-Log 'Strict privacy settings: skipped, you said no' -Level Skip }
+            elseif (Set-RegList -Items $privacyStrict -Step 'privacy') { $restartExplorer = $true }
+        }
+    }
+
+
+    # === 6. Extras ===========================================================
+    Write-Log 'Extras' -Level Step
+    if ($newName) { Rename-ThisPC -NewName $newName }
+    if ($blackScreen) { Set-BlackBackground }
+    if (-not ($newName -or $blackScreen)) { Write-Log 'None' -Level Skip }
+
+
+    # === 7. Clean-up =========================================================
+    Write-Log 'Clean-up' -Level Step
+    if ($doCleanup) { Invoke-ComponentCleanup } else { Write-Log 'Skipped, you said no' -Level Skip }
 }
-
-
-# === 6. Extras ===============================================================
-Write-Log 'Extras' -Level Step
-if ($newName) { Rename-ThisPC -NewName $newName }
-if ($blackScreen) { Set-BlackBackground }
-if (-not ($newName -or $blackScreen)) { Write-Log 'None' -Level Skip }
-
-
-# === 7. Clean-up =============================================================
-Write-Log 'Clean-up' -Level Step
-if ($doCleanup) { Invoke-ComponentCleanup } else { Write-Log 'Skipped, you said no' -Level Skip }
+finally { Set-KeepAwake $false }
 
 
 # === Summary =================================================================
-Set-KeepAwake $false
 Show-Summary
 if ($restartExplorer) { Request-ExplorerRestart }
 $needsRestart = $script:Results | Where-Object { $_.Status -eq 'Changed' -and $_.Step -in 'remove', 'apps', 'tweaks', 'personal', 'privacy', 'extras' }

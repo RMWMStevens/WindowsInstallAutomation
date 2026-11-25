@@ -10,6 +10,7 @@
     #   IfPresent  $true: only where the key already exists
     #   IfData     only change it from this value (Windows' default), so a
     #              setting someone chose stays
+    #   NotOnWork  $true: left alone on a work PC
     #   TaskbarAutoHide  $true: "Automatically hide the taskbar", set the way
     #              Settings does it; no Key, Value or Data
     #   Why        what it does and where it comes from, where the name is not
@@ -35,14 +36,6 @@
            Why  = 'Windows search finds things on this PC only, no Bing results.'
            Key  = 'HKCU:\Software\Policies\Microsoft\Windows\Explorer'
            Value = 'DisableSearchBoxSuggestions'; Data = 1 }
-        @{ Name = 'No Bing in Start search'
-           Why  = 'Older key, for older builds.'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
-           Value = 'BingSearchEnabled'; Data = 0 }
-        @{ Name = 'No Cortana in search'
-           Why  = 'Older key, for older builds.'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Search'
-           Value = 'CortanaConsent'; Data = 0 }
         @{ Name = 'No search highlights'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\SearchSettings'
            Value = 'IsDynamicSearchBoxEnabled'; Data = 0 }
@@ -54,10 +47,6 @@
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
            Value = 'HideFileExt'; Data = 0; Explorer = $true }
         #>
-        @{ Name = 'Hide the chat button'
-           Why  = 'Windows 11 21H2 and 22H2 only; ignored elsewhere.'
-           Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
-           Value = 'TaskbarMn'; Data = 0; Explorer = $true }
         @{ Name = 'Explorer: no OneDrive and Microsoft 365 ads'
            Why  = '(unchecked) Folder Options > View: "Show sync provider notifications" off.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
@@ -219,7 +208,7 @@
 
         # --- system ---
         @{ Name = 'Storage Sense on'
-           Why  = 'Clears temp files, and Recycle Bin items older than 30 days, only when the disk runs low (next value). Downloads is never touched.'
+           Why  = 'Clears temp files, and Recycle Bin items older than 30 days, only when the disk runs low (next value). Setup leaves the Downloads setting alone.'
            Key  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\StorageSense\Parameters\StoragePolicy'
            Value = '01'; Data = 1 }
         @{ Name = 'Storage Sense only when the disk runs low'

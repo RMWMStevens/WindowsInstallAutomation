@@ -107,7 +107,8 @@ say no for Microsoft 365 Family or Personal. Setup does
 not activate it: open Word and sign in. It installs last. When Office is
 already on the PC, Microsoft 365 or an older Office like Office 2021, Setup
 leaves it alone; to switch, uninstall it in Settings > Apps first. On a work
-PC, leave Office to IT.
+PC, Setup never installs or removes Office, even when you pick it: that is
+IT's.
 
 **The keep list**: after the first questions, Setup lists the apps from
 `data\apps-remove.psd1` that are on this PC, with the sponsored apps (Candy
@@ -156,13 +157,15 @@ scheduled tasks, the firewall, antivirus settings and activation.
 
 ### Your answers decide
 
-- **Work PC: yes** keeps Teams and its Outlook add-in, OneDrive, new Outlook,
-  Quick Assist, the Microsoft 365 app and its companions, To Do, Power
-  Automate and Sticky Notes. It skips the rename and the strict privacy
+- **Work PC: yes** leaves Office to IT: Setup does not install or remove it,
+  and keeps every Outlook (classic and new), Teams and its Outlook add-in,
+  OneDrive, Quick Assist, the Microsoft 365 app and its companions, To Do,
+  Power Automate and Sticky Notes. It skips the rename and the strict privacy
   settings, so diagnostic data, error reports, Find my device and Office's
-  online features stay the way IT set them. A policy that already has another
-  value is left alone, as IT may have set it. The Copilot app and the personal
-  Teams app are still removed.
+  online features stay the way IT set them. It leaves the Windows AI service
+  alone, as IT may roll out AI features that need it. A policy that already
+  has another value is left alone, as IT may have set it. The Copilot app and
+  the personal Teams app are still removed.
 - **Tweaks: yes** (default) applies `data\tweaks-general.psd1`.
 - **Privacy: yes** (default) applies `data\privacy-general.psd1`.
 - **Strict privacy: yes** also applies `data\privacy-strict.psd1`.
@@ -196,8 +199,7 @@ does and where it comes from.
 **General tweaks** (`data\tweaks-general.psd1`), for any PC:
 
 - **Search**: no Bing, web suggestions or highlights in Windows search.
-- **Explorer and taskbar**: no chat button and no OneDrive banners in
-  Explorer. F1 no longer opens "Get help".
+- **Explorer**: no OneDrive banners. F1 no longer opens "Get help".
 - **No ads or nags**: no tips, suggestions, "finish setting up" screens or
   account notices in Start and Settings; no phone suggestions; no fun facts or
   widgets on the lock screen; no feedback requests; no sponsored apps installed
@@ -216,8 +218,9 @@ does and where it comes from.
   Edge (WebView2), which saves 75 to 150 MB of RAM. If Windows search
   misbehaves after an update, suspect this first.
 - **Misc**: Storage Sense clears temp files and Recycle Bin items older than
-  30 days, only when the disk runs low (never Downloads); long file paths work
-  in apps that support them; no update restarts between 07:00 and 01:00.
+  30 days, only when the disk runs low (Setup leaves the Downloads setting
+  alone); long file paths work in apps that support them; no update restarts
+  between 07:00 and 01:00.
 
 **Personal** (`data\tweaks-personal.psd1`), my own taste:
 
@@ -231,8 +234,7 @@ does and where it comes from.
 - **Dark mode** for Windows and apps.
 - **Typing**: no autocorrect or text suggestions.
 - **Misc**: clipboard history (Win+V); a sleeping laptop on battery drops
-  Wi-Fi, so mail and messages arrive once it wakes; a blue screen shows the
-  error details, which usually name the driver at fault.
+  Wi-Fi, so mail and messages arrive once it wakes.
 
 **Privacy** (`data\privacy-general.psd1`), for any PC:
 
@@ -241,8 +243,9 @@ does and where it comes from.
 - Speech, typing and handwriting are not sent to Microsoft or learned from, so
   voice typing (Win+H) may not work.
 - AI: Recall and its snapshots, Click to Do and the AI in Settings, Paint and
-  Notepad are off, and the Windows AI service is disabled. Edge: no sidebar or
-  Copilot, no AI writing or history search, and its local AI model is deleted.
+  Notepad are off, and the Windows AI service is disabled (not on a work PC).
+  Edge: no sidebar or Copilot, no AI writing or history search, and its local
+  AI model is deleted.
 
 **Strict privacy** (`data\privacy-strict.psd1`), never on a work PC:
 
@@ -261,8 +264,8 @@ does and where it comes from.
   drifted back.
 - **Most settings without `(policy)`** are a normal switch in Settings. You can
   flip one back, but the next run sets it again. A few have no switch at all
-  (F1, the startup delay, search without WebView2, the blue screen details and
-  the Windows AI service); only `-Restore` or regedit undoes those.
+  (F1, the startup delay, search without WebView2 and the Windows AI
+  service); only `-Restore` or regedit undoes those.
 - **To keep a setting your way**, wrap its block in `<# ... #>` in a downloaded
   copy and start Setup with `Setup.cmd`. That stops Setup setting it but does
   not undo it; `-Restore` does.
@@ -279,7 +282,7 @@ Setup.cmd -WhatIf
 ```
 
 Shows everything it would install, remove, update and change. It changes
-nothing; it only writes its log.
+nothing; it only writes its log, in a folder with a `README.txt`.
 
 ## Undo: -Restore
 
@@ -291,9 +294,10 @@ Puts the settings Setup changed back to how they were before the first run:
 the tweaks, personal and privacy settings, the Windows AI service and the
 desktop background, and it removes the Start pins policy. Before Setup changes
 a setting, it writes the old value in that run's log. `-Restore` reads those
-back, newest run first, and asks once before changing anything. It only puts
-back settings that are in Setup's data files, so a log someone edited cannot
-set anything else. Each run is put back once; if something failed, the next
+back, newest run first, and asks once before changing anything. Policies and
+settings for the whole PC are only put back while they are in Setup's data
+files, so a log someone edited cannot change them; one that is not shows in
+yellow. Each run is put back once; if something failed, the next
 `-Restore` tries that run again. Restart afterwards: policies and services only
 change back after a restart. `Setup.cmd -Restore -WhatIf` shows what it would
 put back.
@@ -308,8 +312,9 @@ Not put back:
   them). Change them in Settings.
 - System Protection, and the winget pin on Node.js.
 - Runs from before `-Restore` existed (November 2026), which did not write
-  down the old values, runs whose logs were deleted, and runs by another
-  account (their logs are in that account's Documents).
+  down the old values, runs whose log has no PC ID in its name (before 24
+  November 2026), runs whose logs were deleted, and runs by another account
+  (their logs are in that account's Documents).
 
 System Restore can undo more, back to a restore point from before the first
 run, but removed Store apps often come back broken, and a feature update
